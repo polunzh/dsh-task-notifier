@@ -3,6 +3,7 @@
 **中文** | [English](#english)
 
 [![npm](https://img.shields.io/npm/v/@polunzh/dsh-task-notifier?label=npm&color=0891b2)](https://www.npmjs.com/package/@polunzh/dsh-task-notifier)
+[![开放插件市场](https://img.shields.io/endpoint?url=https%3A%2F%2Fdshopen.org%2Fbadge%2F%2540polunzh%2Fdsh-task-notifier.json)](https://dshopen.org/zh/plugins/@polunzh/dsh-task-notifier/)
 [![license](https://img.shields.io/badge/license-MIT-16a34a)](./LICENSE)
 [![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.0--rc.2-2563eb)](./package.json)
 
@@ -28,9 +29,19 @@ DSH 跑长任务时，你切走去干别的，回来才发现早就跑完了。�
 
 ### 安装
 
-**方式一：从自建索引安装**（推荐，可自动检测更新）
+**方式一：开放插件市场安装**（推荐，可在市场点赞）
 
-「插件 → 实验性插件」打开「自定义插件市场」→ **发现 → 添加索引源**，粘贴：
+已收录进社区市场（分类「工作流与协作」，已通过源码级验证 ✅）：在「插件 → 实验性插件」打开「自定义插件市场」→ **发现 → 添加索引源**，粘贴：
+
+```
+https://dshopen.org/index.json
+```
+
+之后搜索「任务通知台 / Task Notifier」安装；市场页与点赞见 [dshopen 插件页](https://dshopen.org/zh/plugins/@polunzh/dsh-task-notifier/)。
+
+**方式二：从自建索引安装**（可自动检测更新）
+
+同样在「发现 → 添加索引源」粘贴：
 
 ```
 https://dsh.127.dev/index.json
@@ -39,13 +50,13 @@ https://dsh.127.dev/index.json
 之后搜索「任务通知台 / Task Notifier」安装；有新版本时列表会显示可更新，卸载在「已安装」里。
 索引每 6 小时随 npm 刷新，源码见 [dsh-plugins-index](https://github.com/polunzh/dsh-plugins-index)。
 
-**方式二：npm 安装**
+**方式三：npm 安装**
 
 ```bash
 dsh plugin --profile desktop add @polunzh/dsh-task-notifier
 ```
 
-**方式三：从本地目录安装**（开发调试）
+**方式四：从本地目录安装**（开发调试）
 
 在 DSH 里用 `plugin_manager` 的 `install_bundle`，`target` 填本仓库的绝对路径。
 
@@ -152,7 +163,17 @@ Long-running DSH sessions finish while you are looking somewhere else. This plug
 
 ### Install
 
-**Option 1 — via the self-hosted index (recommended; tracks updates)**
+**Option 1 — via the Open Plugin Market (recommended; supports likes)
+
+Listed on the community market (category "workflow", source-verified ✅). In DSH: **Plugins → Experimental plugins** → enable **Custom plugin markets** → **Discover → Add index source**, then paste:
+
+```
+https://dshopen.org/index.json
+```
+
+Search for "任务通知台 / Task Notifier" and install. Market page: [dshopen plugin page](https://dshopen.org/zh/plugins/@polunzh/dsh-task-notifier/).
+
+**Option 2 — via the self-hosted index (tracks updates)**
 
 In DSH: **Plugins → Experimental plugins** → enable **Custom plugin markets** → **Discover → Add index source**, then paste:
 
@@ -163,13 +184,13 @@ https://dsh.127.dev/index.json
 Search for "任务通知台 / Task Notifier" and install. New versions show as update-available; uninstall from **Installed**.
 The index refreshes from npm every 6 hours — source at [dsh-plugins-index](https://github.com/polunzh/dsh-plugins-index).
 
-**Option 2 — npm**
+**Option 3 — npm**
 
 ```bash
 dsh plugin --profile desktop add @polunzh/dsh-task-notifier
 ```
 
-**Option 3 — from a local checkout (development)**
+**Option 4 — from a local checkout (development)**
 
 Use `plugin_manager` with `install_bundle` and point `target` at this repository's absolute path.
 
