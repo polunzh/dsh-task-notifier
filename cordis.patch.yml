@@ -1,0 +1,12 @@
+# 任务通知台：单行挂载。
+# 宿主侧监听会话运行状态事件、维护未读已读并兜底发 macOS 系统通知；
+# 浏览器侧由 package.json 的 dsh.client 声明进入加载图，注册侧边栏面板与提示音。
+#
+# 可调 config（全部可省略，默认值在这几个字段本身）：
+#   osNotify: "auto"   # auto=页面在线走浏览器通知，页面离线兜底系统通知；always=恒发系统通知；off=不发
+#   sound: true        # 浏览器端合成提示音开关
+#   osSound: "Glass"   # macOS 系统提示音名（守/薄荷等 macOS 自带音）
+#   osTitle: "DeepSeek Harness"  # 系统通知标题
+- insert:
+    - id: task-notifier
+      name: '@polunzh/dsh-task-notifier'

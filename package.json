@@ -1,0 +1,70 @@
+{
+  "name": "@polunzh/dsh-task-notifier",
+  "version": "1.1.0",
+  "description": "任务通知台：任务完成时响提示音并弹系统/浏览器通知，侧边栏「任务」面板可筛选进行中与已完成未读的任务。Task-completion chime + system/browser notifications, plus a Tasks sidebar panel to filter running and unread-completed sessions.",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./core": "./lib/core.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    },
+    "manifestVersion": 1
+  },
+  "files": [
+    "lib",
+    "locale",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "SECURITY.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "preview": "node preview/server.mjs",
+    "screenshot": "node scripts/screenshot.mjs"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "plugin",
+    "notification",
+    "notifications",
+    "task",
+    "task-panel",
+    "unread",
+    "chime",
+    "sidebar",
+    "macos",
+    "productivity"
+  ],
+  "author": "polunzh (https://github.com/polunzh)",
+  "license": "MIT",
+  "homepage": "https://github.com/polunzh/dsh-task-notifier#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/polunzh/dsh-task-notifier.git"
+  },
+  "bugs": {
+    "url": "https://github.com/polunzh/dsh-task-notifier/issues"
+  },
+  "engines": {
+    "dsh": ">=0.2.0-rc.2",
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
