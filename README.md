@@ -33,7 +33,7 @@ DSH 跑长任务时，你切走去干别的，回来才发现早就跑完了。�
 「插件 → 实验性插件」打开「自定义插件市场」→ **发现 → 添加索引源**，粘贴：
 
 ```
-https://polunzh.com/dsh-plugins-index/index.json
+https://dsh.127.dev/index.json
 ```
 
 之后搜索「任务通知台 / Task Notifier」安装；有新版本时列表会显示可更新，卸载在「已安装」里。
@@ -157,7 +157,7 @@ Long-running DSH sessions finish while you are looking somewhere else. This plug
 In DSH: **Plugins → Experimental plugins** → enable **Custom plugin markets** → **Discover → Add index source**, then paste:
 
 ```
-https://polunzh.com/dsh-plugins-index/index.json
+https://dsh.127.dev/index.json
 ```
 
 Search for "任务通知台 / Task Notifier" and install. New versions show as update-available; uninstall from **Installed**.
