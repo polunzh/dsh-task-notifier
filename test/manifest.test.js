@@ -79,3 +79,18 @@ test("icon.svg 是合法 SVG 且体积远小于 256 KiB", () => {
   assert.match(svg, /<\/svg>\s*$/);
   assert.ok(Buffer.byteLength(svg) < 256 * 1024);
 });
+
+test("客户端模块 id 必须等于包名（与同名插件共存时不会撞车）", () => {
+  const client = readFileSync(join(root, "lib", "client.js"), "utf8");
+  const match = client.match(/__ModuleLoader__\.load\(\{\s*id:\s*"([^"]+)"/);
+  assert.ok(match, "找不到 __ModuleLoader__.load 的模块 id");
+  assert.equal(match[1], pkg.name);
+});
+
+test("patch row id 带插件前缀，避免与其他插件的 row id 冲突", () => {
+  const match = patch.match(/- id:\s*([A-Za-z0-9._-]+)/);
+  assert.ok(match, "找不到 insert row 的 id");
+  assert.equal(match[1], "polunzh-task-notifier");
+  // 通用 id（如 task-notifier）会和别的同名插件撞
+  assert.notEqual(match[1], "task-notifier");
+});

@@ -911,9 +911,9 @@
             fail("React / ReactDOM 没有加载", "检查 preview/vendor/ 下的 UMD 文件是否存在");
             return;
           }
-          var pkg = harness.packages["dsh-task-notifier"];
+          var pkg = harness.packages[Object.keys(harness.packages)[0]];
           if (!pkg || typeof pkg.apply !== "function") {
-            fail("没有捕获到 dsh-task-notifier 的模块输出", "确认 ../lib/client.js 在模块桩之后加载，且 factory 正常返回 apply()");
+            fail("没有捕获到插件的模块输出", "确认 ../lib/client.js 在模块桩之后加载，且 factory 正常返回 apply()");
             return;
           }
 

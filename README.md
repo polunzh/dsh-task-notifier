@@ -65,7 +65,7 @@ dsh plugin --profile desktop add @polunzh/dsh-task-notifier
 
 ```yaml
 - insert:
-    - id: task-notifier
+    - id: polunzh-task-notifier
       name: '@polunzh/dsh-task-notifier'
       config:
         osNotify: auto            # auto | always | off
@@ -90,6 +90,12 @@ dsh plugin --profile desktop add @polunzh/dsh-task-notifier
 - **无安装期脚本**：`package.json` 里没有 `preinstall/postinstall/prepare`。
 
 细节、威胁模型与限流参数见 [SECURITY.md](./SECURITY.md)。
+
+### 从 1.1.0 升级 / 共存说明
+
+1.1.1 起浏览器模块 id 改为包名 `@polunzh/dsh-task-notifier`，patch row id 改为 `polunzh-task-notifier`，
+这样即使机器上同时装有另一个同名的 `dsh-task-notifier` 插件，也不会因为 id 重复而让 DSH 起不来。
+如果你之前用 `link:` 或旧版装过，**请只保留一份**：先在「插件 → 已安装」卸载旧的，再装 1.1.1。
 
 ### 兼容性
 
@@ -193,7 +199,7 @@ Everything is optional. Put it in your profile's `cordis.patch.yml`:
 
 ```yaml
 - insert:
-    - id: task-notifier
+    - id: polunzh-task-notifier
       name: '@polunzh/dsh-task-notifier'
       config:
         osNotify: auto            # auto | always | off
@@ -218,6 +224,13 @@ Everything is optional. Put it in your profile's `cordis.patch.yml`:
 - **No install-time scripts**: no `preinstall` / `postinstall` / `prepare` in `package.json`.
 
 Threat model, limits and rate limits are documented in [SECURITY.md](./SECURITY.md).
+
+### Upgrading from 1.1.0 / coexistence
+
+Since 1.1.1 the browser module id is the package name (`@polunzh/dsh-task-notifier`) and the patch row id is
+`polunzh-task-notifier`, so a different plugin that happens to share the old ids can no longer break DSH's boot.
+If you previously installed a `link:` copy or an older version, **keep only one**: uninstall the old entry from
+**Plugins → Installed** first, then install 1.1.1.
 
 ### Compatibility
 

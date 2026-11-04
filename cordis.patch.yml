@@ -8,5 +8,5 @@
 #   osSound: "Glass"   # macOS 系统提示音名（守/薄荷等 macOS 自带音）
 #   osTitle: "DeepSeek Harness"  # 系统通知标题
 - insert:
-    - id: task-notifier
+    - id: polunzh-task-notifier
       name: '@polunzh/dsh-task-notifier'
