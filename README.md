@@ -28,7 +28,7 @@ DSH 跑长任务时，你切走去干别的，回来才发现早就跑完了。�
 
 ### 安装
 
-**方式零：从自建索引安装**（推荐，可自动检测更新）
+**方式一：从自建索引安装**（推荐，可自动检测更新）
 
 「插件 → 实验性插件」打开「自定义插件市场」→ **发现 → 添加索引源**，粘贴：
 
@@ -38,16 +38,6 @@ https://polunzh.com/dsh-plugins-index/index.json
 
 之后搜索「任务通知台 / Task Notifier」安装；有新版本时列表会显示可更新，卸载在「已安装」里。
 索引每 6 小时随 npm 刷新，源码见 [dsh-plugins-index](https://github.com/polunzh/dsh-plugins-index)。
-
-**方式一：从开放插件市场安装**（收录后）
-
-在 DSH：插件 → 实验性插件 → 打开「自定义插件市场」→ 发现 → 添加索引源
-
-```
-https://dshopen.org/index.json
-```
-
-然后搜索「任务通知台 / Task Notifier」安装。
 
 **方式二：npm 安装**
 
@@ -162,7 +152,7 @@ Long-running DSH sessions finish while you are looking somewhere else. This plug
 
 ### Install
 
-**Option 0 — via the self-hosted index (recommended; tracks updates)**
+**Option 1 — via the self-hosted index (recommended; tracks updates)**
 
 In DSH: **Plugins → Experimental plugins** → enable **Custom plugin markets** → **Discover → Add index source**, then paste:
 
@@ -172,16 +162,6 @@ https://polunzh.com/dsh-plugins-index/index.json
 
 Search for "任务通知台 / Task Notifier" and install. New versions show as update-available; uninstall from **Installed**.
 The index refreshes from npm every 6 hours — source at [dsh-plugins-index](https://github.com/polunzh/dsh-plugins-index).
-
-**Option 1 — via the community market (once listed)**
-
-In DSH: **Plugins → Experimental plugins** → **Custom plugin markets** → **Discover → Add index source**:
-
-```
-https://dshopen.org/index.json
-```
-
-Then search for "Task Notifier".
 
 **Option 2 — npm**
 
