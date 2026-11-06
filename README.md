@@ -131,7 +131,7 @@ dsh plugin --profile desktop add @polunzh/dsh-task-notifier
 ### 开发
 
 ```bash
-npm test              # node:test，52 个用例（含安全边界与中英字典一致性）
+npm test              # node:test，53 个用例（含安全边界与中英字典一致性）
 npm run preview       # 本地预览页（真实 client.js + 模拟数据）
 npm run screenshot    # 重新生成 preview/screenshots/*.png
 ```

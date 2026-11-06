@@ -303,6 +303,20 @@ test("心跳记录语言，/test 回报 locale 并受冷却限制", async () => 
   assert.equal(second.status, 429, "冷却期内必须拒绝，避免被反复触发刷屏");
 });
 
+test("osNotify=off 的 disabled 判定先于平台限制，各平台答案一致", async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(process, "platform");
+  const harness = createHarness({ config: { osNotify: "off" } });
+  try {
+    // 非 macOS 上曾因先判平台而回报 unsupported-platform，让 CI（Linux）与本地结论不同。
+    Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+    const response = await harness.call({ method: "POST", url: "/task-notifier/api/test", headers: JSON_HEADERS, body: {} });
+    assert.equal(response.json.ok, false);
+    assert.equal(response.json.reason, "disabled");
+  } finally {
+    if (descriptor) Object.defineProperty(process, "platform", descriptor);
+  }
+});
+
 test("/notify 限流且只接受合法 id", async () => {
   const harness = createHarness({ config: { osNotify: "off" } });
   const first = await harness.call({
