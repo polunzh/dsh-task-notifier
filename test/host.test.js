@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -14,6 +14,11 @@ function createHarness(options = {}) {
   const handlers = new Map();
   const registrations = [];
   const effects = [];
+  // 每个 harness 用独立的 DSH_HOME：插件现在会在 apply 时读取持久化状态，
+  // 共享目录会让前一个用例的任务泄漏到下一个用例。
+  const home = options.home ?? mkdtempSync(join(tmpdir(), "dtn-host-test-"));
+  homes.push(home);
+  process.env.DSH_HOME = home;
   const ctx = {
     logger: { debug() {}, info() {}, warn() {} },
     connection: "connection" in options ? options.connection : { requestRejection: () => undefined },
@@ -60,16 +65,16 @@ function createHarness(options = {}) {
     return { status: out.status, headers: out.headers, json: out.body ? JSON.parse(out.body) : null };
   }
 
-  return { ctx, handlers, call, registrations };
+  return { ctx, handlers, call, registrations, home };
 }
 
 const previousHome = process.env.DSH_HOME;
-const home = mkdtempSync(join(tmpdir(), "dtn-host-test-"));
-process.env.DSH_HOME = home;
+const homes = [];
 
 test.after(() => {
   if (previousHome === undefined) delete process.env.DSH_HOME;
   else process.env.DSH_HOME = previousHome;
+  for (const dir of homes.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
 const JSON_HEADERS = { "content-type": "application/json" };
@@ -141,16 +146,134 @@ test("任务完成事件会置未读、写入 0600 状态文件，removed 后消
   assert.equal(task.title, "重构通知去重逻辑");
 
   await new Promise((resolve) => setTimeout(resolve, 800));
-  const file = join(home, "storages", "dsh-task-notifier", "state.json");
+  const file = join(harness.home, "storages", "dsh-task-notifier", "state.json");
   const fileStat = statSync(file);
   assert.equal(fileStat.mode & 0o777, 0o600, "状态文件必须只有属主可读写");
-  const dirStat = statSync(join(home, "storages", "dsh-task-notifier"));
+  const dirStat = statSync(join(harness.home, "storages", "dsh-task-notifier"));
   assert.equal(dirStat.mode & 0o777, 0o700, "状态目录必须只有属主可进入");
   assert.equal(JSON.parse(readFileSync(file, "utf8")).version, 1);
 
   removed("sess-1");
   const after = await harness.call();
   assert.equal(after.json.tasks.find((item) => item.id === "sess-1"), undefined);
+});
+
+test("启动时恢复持久化的未读任务与标题", async () => {
+  const home = mkdtempSync(join(tmpdir(), "dtn-host-seed-"));
+  const dir = join(home, "storages", "dsh-task-notifier");
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  writeFileSync(
+    join(dir, "state.json"),
+    JSON.stringify({
+      version: 1,
+      savedAt: 1,
+      tasks: [{ id: "sess-restored", title: "上次完成的任务", completedAt: 10, unread: true, changeAt: 10 }],
+    }),
+  );
+
+  const harness = createHarness({ home });
+  const state = await harness.call();
+  const task = state.json.tasks.find((item) => item.id === "sess-restored");
+  assert.ok(task, "重启后未读快照必须恢复");
+  assert.equal(task.title, "上次完成的任务");
+  assert.equal(task.unread, true);
+  assert.equal(task.running, false);
+  assert.equal(task.needsInput, false);
+});
+
+test("启动时从 sessionQuery 预热 live 会话标题", async () => {
+  const records = [
+    { header: { id: "sess-live", createdAt: 1 }, live: true, persisted: true },
+    { header: { id: "sess-cold", createdAt: 2 }, live: false, persisted: true },
+  ];
+  const seen = [];
+  let resolveTitles;
+  const titlesRead = new Promise((resolve) => {
+    resolveTitles = resolve;
+  });
+  const sessionQuery = {
+    async listSessions() {
+      return records;
+    },
+    async readTitleSnapshots(ids) {
+      seen.push(...ids);
+      resolveTitles();
+      return [{ status: "fulfilled", value: { session: { id: "sess-live" }, title: { title: "启动预热标题" } } }];
+    },
+  };
+
+  const harness = createHarness({ sessionQuery });
+  await titlesRead;
+  // 让 seedFromSessionQuery 的 await 链把标题写回任务表
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const state = await harness.call();
+  const task = state.json.tasks.find((item) => item.id === "sess-live");
+  assert.ok(task, "live 会话应在启动时预热进任务表");
+  assert.equal(task.title, "启动预热标题");
+  assert.deepEqual(seen, ["sess-live"], "只为 live 会话读取标题快照");
+  assert.equal(state.json.tasks.find((item) => item.id === "sess-cold"), undefined, "历史会话不预热");
+});
+
+test("启动时补齐持久化任务里缺失的标题", async () => {
+  const home = mkdtempSync(join(tmpdir(), "dtn-host-heal-"));
+  const dir = join(home, "storages", "dsh-task-notifier");
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  writeFileSync(
+    join(dir, "state.json"),
+    JSON.stringify({
+      version: 1,
+      savedAt: 1,
+      tasks: [{ id: "sess-old", title: null, completedAt: 10, unread: true, changeAt: 10 }],
+    }),
+  );
+
+  let readIds = null;
+  let resolveRead;
+  const readStarted = new Promise((resolve) => {
+    resolveRead = resolve;
+  });
+  const sessionQuery = {
+    async listSessions() {
+      return [];
+    },
+    async readTitleSnapshots(ids) {
+      readIds = ids;
+      resolveRead();
+      return [{ status: "fulfilled", value: { title: { title: "从日志补回的标题" } } }];
+    },
+  };
+
+  const harness = createHarness({ home, sessionQuery });
+  await readStarted;
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(readIds, ["sess-old"], "缺标题的持久化任务也要读快照");
+  const task = (await harness.call()).json.tasks.find((item) => item.id === "sess-old");
+  assert.equal(task.title, "从日志补回的标题");
+});
+
+test("session/title 事件在轮次进行中就更新标题", async () => {
+  const harness = createHarness();
+  harness.handlers.get("api-session/status")("sess-title", true);
+  let task = (await harness.call()).json.tasks.find((item) => item.id === "sess-title");
+  assert.equal(task.title, null, "状态事件本身不带标题");
+
+  harness.handlers.get("session/event")(
+    { id: "sess-title" },
+    { type: "session/title", data: { title: "首轮提示生成的标题" } },
+  );
+  task = (await harness.call()).json.tasks.find((item) => item.id === "sess-title");
+  assert.equal(task.title, "首轮提示生成的标题");
+});
+
+test("api-session/added 的 projections.values.title 也能取到标题", async () => {
+  const harness = createHarness();
+  harness.handlers.get("api-session/added")({
+    sessionId: "sess-projection",
+    projections: { kind: "sequenced", asOfSeq: 3, values: { title: "投影里的标题" } },
+  });
+  const task = (await harness.call()).json.tasks.find((item) => item.id === "sess-projection");
+  assert.ok(task);
+  assert.equal(task.title, "投影里的标题");
 });
 
 test("阻塞提问、计划审阅与审批会标记「需要输入」，并在落地后清除", async () => {

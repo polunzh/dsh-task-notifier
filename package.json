@@ -1,6 +1,6 @@
 {
   "name": "@polunzh/dsh-task-notifier",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "description": "任务通知台：任务完成时响提示音并弹系统/浏览器通知，侧边栏「任务」面板可筛选待回复、进行中与已完成未读的任务。Task-completion chime + system/browser notifications, plus a Tasks sidebar panel that surfaces sessions waiting on your input, running, and unread-completed.",
   "type": "module",
   "main": "./lib/index.js",
