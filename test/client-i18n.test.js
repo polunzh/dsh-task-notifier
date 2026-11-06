@@ -56,11 +56,11 @@ test("模板键前缀（permission.* / empty.*）都已覆盖", () => {
   );
   assert.deepEqual(
     [...zhKeys].filter((key) => key.startsWith("empty.")).sort(),
-    ["empty.idle", "empty.nomatch", "empty.running", "empty.unread"],
+    ["empty.idle", "empty.input", "empty.nomatch", "empty.running", "empty.unread"],
   );
   assert.deepEqual(
     [...zhKeys].filter((key) => key.startsWith("tab.")).sort(),
-    ["tab.all", "tab.idle", "tab.running", "tab.unread"],
+    ["tab.all", "tab.idle", "tab.input", "tab.running", "tab.unread"],
   );
 });
 

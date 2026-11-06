@@ -153,6 +153,84 @@ test("任务完成事件会置未读、写入 0600 状态文件，removed 后消
   assert.equal(after.json.tasks.find((item) => item.id === "sess-1"), undefined);
 });
 
+test("阻塞提问、计划审阅与审批会标记「需要输入」，并在落地后清除", async () => {
+  const harness = createHarness();
+  const onEvent = harness.handlers.get("session/event");
+  const status = harness.handlers.get("api-session/status");
+  assert.equal(typeof onEvent, "function", "应订阅 session/event 观察等待状态");
+  harness.handlers.get("api-session/added")({ id: "sess-need-1", title: "确认是否覆盖线上数据" });
+  status("sess-need-1", true);
+
+  const read = async () => (await harness.call()).json.tasks.find((item) => item.id === "sess-need-1");
+
+  onEvent(
+    { id: "sess-need-1" },
+    { type: "tool/call", data: { name: "ask_user_question", callId: "call-q1", arguments: "{}" } },
+  );
+  let task = await read();
+  assert.equal(task.needsInput, true);
+  assert.equal(task.inputKind, "question");
+  assert.equal(task.running, true);
+
+  // 定时提问超时 / 作答后都会有 tool/result，两种情况下都不再阻塞。
+  onEvent({ id: "sess-need-1" }, { type: "tool/result", data: { message: { toolCallId: "call-q1", content: [] } } });
+  task = await read();
+  assert.equal(task.needsInput, false);
+  assert.equal(task.inputKind, null);
+
+  onEvent({ id: "sess-need-1" }, { type: "tool/call", data: { name: "exit_plan_mode", callId: "call-p1" } });
+  task = await read();
+  assert.equal(task.needsInput, true);
+  assert.equal(task.inputKind, "plan");
+
+  onEvent({ id: "sess-need-1" }, { type: "approval/asked", data: { id: "ap-1", toolName: "bash" } });
+  task = await read();
+  assert.equal(task.inputKind, "approval", "审批优先于计划审阅");
+
+  onEvent({ id: "sess-need-1" }, { type: "approval/decided", data: { id: "ap-1", outcome: "rejected" } });
+  task = await read();
+  assert.equal(task.inputKind, "plan", "审批落地后回到仍在等待的计划审阅");
+
+  onEvent({ id: "sess-need-1" }, { type: "turn/end", data: { turn: 1, reason: "completed" } });
+  task = await read();
+  assert.equal(task.needsInput, false);
+  assert.equal(task.inputKind, null);
+
+  // 轮次翻转是兜底：旧轮次上的等待不能跨轮次残留。
+  onEvent({ id: "sess-need-1" }, { type: "tool/call", data: { name: "ask_user_question", callId: "call-q2" } });
+  assert.equal((await read()).needsInput, true);
+  status("sess-need-1", false);
+  task = await read();
+  assert.equal(task.needsInput, false);
+  assert.equal(task.running, false);
+});
+
+test("只有阻塞工具才标记需要输入，脏事件不会凭空造任务", async () => {
+  const harness = createHarness();
+  const onEvent = harness.handlers.get("session/event");
+  const before = (await harness.call()).json.tasks.length;
+
+  onEvent({ id: "sess-noise" }, { type: "tool/call", data: { name: "bash", callId: "call-x" } });
+  onEvent({ id: "sess-noise" }, { type: "tool/call", data: { name: "ask_user_question" } });
+  onEvent({ id: "" }, { type: "approval/asked", data: { id: "ap-x" } });
+  onEvent({ id: "sess-noise" }, { type: "tool/result", data: {} });
+  onEvent({ id: "sess-noise" }, null);
+
+  const after = (await harness.call()).json.tasks;
+  assert.equal(after.length, before, "非等待事件不应造出任务");
+  assert.equal(after.find((item) => item.id === "sess-noise"), undefined);
+});
+
+test("等待输入的任务即便还没有 added 事件也能进入任务表", async () => {
+  const harness = createHarness();
+  const onEvent = harness.handlers.get("session/event");
+  onEvent("sess-need-2", { type: "approval/asked", data: { id: "ap-2", toolName: "bash" } });
+  const task = (await harness.call()).json.tasks.find((item) => item.id === "sess-need-2");
+  assert.ok(task);
+  assert.equal(task.needsInput, true);
+  assert.equal(task.inputKind, "approval");
+});
+
 test("标题在入库前被净化与截断（控制字符/换行/超长）", async () => {
   const harness = createHarness();
   harness.handlers.get("api-session/added")({

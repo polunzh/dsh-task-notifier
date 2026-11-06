@@ -10,6 +10,7 @@
  *   panel-dark.png     1440×900  ?state=filled&theme=dark
  *   panel-light-en.png 1440×900  ?state=filled&theme=light&locale=en （英文界面）
  *   unread-tab.png     1440×900  ?state=filled&theme=light&tab=unread&focus=tab
+ *   needs-input.png    1440×900  ?state=filled&theme=light&tab=input （待回复分类）
  *   empty.png          1440×900  ?state=empty&theme=light
  *   mobile.png          390×844  ?state=filled&theme=light
  *
@@ -77,6 +78,16 @@ const shots = [
     kind: "filled",
     url: "?state=filled&theme=light&tab=unread&focus=tab",
     narrative: "浅色 · 已完成未读 Tab 聚焦",
+  },
+  {
+    name: "needs-input",
+    width: 1440,
+    height: 900,
+    theme: "light",
+    kind: "filled",
+    url: "?state=filled&theme=light&tab=input",
+    narrative: "浅色 · 待回复 Tab（有人在等你回答）",
+    rowText: "确认是否覆盖线上数据",
   },
   {
     name: "empty",
@@ -429,10 +440,10 @@ function validateShot(shot, info) {
     problems.push(`主区域没有出现标题「${title}」（locale=${info.previewInfo?.locale ?? "?"}）`);
   }
   const expectedTabs = isEnglish
-    ? ["Unread", "Running", "Completed", "All"]
-    : ["已完成未读", "运行中", "已完成", "全部"];
-  if (info.tabs.length !== 4) {
-    problems.push(`Tab 数量异常：期望 4，实际 ${info.tabs.length}（${info.tabs.map((t) => t.text).join(" / ")}）`);
+    ? ["Needs input", "Unread", "Running", "Completed", "All"]
+    : ["待回复", "已完成未读", "运行中", "已完成", "全部"];
+  if (info.tabs.length !== 5) {
+    problems.push(`Tab 数量异常：期望 5，实际 ${info.tabs.length}（${info.tabs.map((t) => t.text).join(" / ")}）`);
   } else {
     for (const label of expectedTabs) {
       if (!info.tabs.some((tab) => tab.text.startsWith(label))) {
@@ -459,6 +470,9 @@ function validateShot(shot, info) {
   if (!info.sidebarIcon) problems.push("侧栏 sidebar.panellist 图标没有渲染");
   if (shot.kind === "filled" && info.rows.length < 1) {
     problems.push(`任务列表为空（期望至少 1 行）：${JSON.stringify(info.textSample.slice(0, 160))}`);
+  }
+  if (shot.rowText && !info.rows.some((row) => row.text.includes(shot.rowText))) {
+    problems.push(`任务行缺少「${shot.rowText}」：${JSON.stringify(info.rows.map((row) => row.text).slice(0, 4))}`);
   }
   if (shot.kind === "filled" && isEnglish && !info.rows.some((row) => row.text.includes("Done ·"))) {
     problems.push(`英文任务行没有出现「Done ·」：${JSON.stringify(info.rows.map((r) => r.text).slice(0, 3))}`);

@@ -164,6 +164,17 @@ test("transitionTask 只在状态翻转时推进时间", () => {
   assert.equal(task.changeAt, 200);
 });
 
+test("transitionTask 在轮次翻转时清掉等待输入状态", () => {
+  const task = { running: true, needsInput: true, inputKind: "approval", startedAt: 1, completedAt: 0, unread: false, changeAt: 1 };
+  transitionTask(task, false, 200);
+  assert.equal(task.needsInput, false);
+  assert.equal(task.inputKind, null);
+  const next = { running: false, needsInput: true, inputKind: "question", startedAt: 0, completedAt: 1, unread: true, changeAt: 1 };
+  transitionTask(next, true, 300);
+  assert.equal(next.needsInput, false);
+  assert.equal(next.inputKind, null);
+});
+
 test("normalizeLocale 与 hostMessages 跟随 en/zh", () => {
   assert.equal(normalizeLocale("en-US"), "en");
   assert.equal(normalizeLocale("zh-CN"), "zh");

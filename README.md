@@ -13,7 +13,7 @@
 
 ## 中文
 
-> DeepSeek Harness（DSH）Web 插件：**任务完成时提醒你**，并给你一个能筛选「已完成未读」的任务面板。
+> DeepSeek Harness（DSH）Web 插件：**任务完成时提醒你**，并给你一个能筛选「待回复 / 已完成未读」的任务面板。
 
 ### 它解决什么
 
@@ -23,7 +23,8 @@ DSH 跑长任务时，你切走去干别的，回来才发现早就跑完了。�
 - **通知双通道**：
   - 页面开着且已授权 → 浏览器 `Notification`，点一下跳回对应会话；
   - 页面关了或未授权 → 宿主在 macOS 上弹系统通知（`osascript`），不会双弹（心跳判重）。
-- **任务面板**：侧边栏图标（带未读角标）→ 四个筛选：**已完成未读 / 运行中 / 已完成 / 全部**，支持按标题搜索、全部标为已读、试听提示音、试发系统通知。
+- **待回复状态**：Agent 向你提问、等你审阅计划或等你审批时，侧栏图标亮起琥珀色脉冲点，面板新增「待回复」分类，点开直接回到那个等你决定的会话。
+- **任务面板**：侧边栏图标（带未读角标）→ 五个筛选：**待回复 / 已完成未读 / 运行中 / 已完成 / 全部**，支持按标题搜索、全部标为已读、试听提示音、试发系统通知。
 - **未读不丢**：状态写在 `$DSH_HOME/storages/dsh-task-notifier/state.json`，重启后还在。
 - **中英双语**：界面与系统通知文案跟随宿主语言（zh / en）。
 
@@ -113,9 +114,13 @@ dsh plugin --profile desktop add @polunzh/dsh-task-notifier
 |---|---|
 | ![浅色](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-light.png) | ![深色](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-dark.png) |
 
-| 已完成未读 | 空状态 |
+| 已完成未读 | 待回复 |
 |---|---|
-| ![未读](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/unread-tab.png) | ![空状态](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/empty.png) |
+| ![未读](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/unread-tab.png) | ![待回复](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/needs-input.png) |
+
+空状态：
+
+![空状态](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/empty.png)
 
 英文界面（跟随宿主语言）：
 
@@ -126,7 +131,7 @@ dsh plugin --profile desktop add @polunzh/dsh-task-notifier
 ### 开发
 
 ```bash
-npm test              # node:test，46 个用例（含安全边界与中英字典一致性）
+npm test              # node:test，52 个用例（含安全边界与中英字典一致性）
 npm run preview       # 本地预览页（真实 client.js + 模拟数据）
 npm run screenshot    # 重新生成 preview/screenshots/*.png
 ```
@@ -147,7 +152,7 @@ preview/       预览页与截图（不进 npm 包）
 <a id="english"></a>
 ## English
 
-> A DeepSeek Harness (DSH) web plugin that **notifies you when a task finishes** and gives you a Tasks panel that filters completed-but-unread sessions.
+> A DeepSeek Harness (DSH) web plugin that **notifies you when a task finishes** and gives you a Tasks panel that surfaces sessions waiting on your input alongside completed-but-unread ones.
 
 ### What it solves
 
@@ -157,7 +162,8 @@ Long-running DSH sessions finish while you are looking somewhere else. This plug
 - **Two notification channels**:
   - Page open and permission granted → browser `Notification`; clicking it jumps back to that session.
   - Page closed or permission not granted → the host raises a macOS system notification (`osascript`). A heartbeat keeps the two channels from double-firing.
-- **Tasks panel** — a sidebar icon with an unread badge and four filters: **unread / running / completed / all**, plus title search, mark-all-read, preview the chime and send a test notification.
+- **Needs-input state** — when an agent asks you a question, waits for a plan review, or waits on an approval, the sidebar icon shows an amber pulsing dot and the panel gains a **Needs input** filter, so you can jump straight to the session that is blocked on you.
+- **Tasks panel** — a sidebar icon with an unread badge and five filters: **needs input / unread / running / completed / all**, plus title search, mark-all-read, preview the chime and send a test notification.
 - **Unread survives restarts** — state lives in `$DSH_HOME/storages/dsh-task-notifier/state.json`.
 - **Bilingual UI** — interface and system-notification text follow the host language (zh / en).
 
@@ -248,9 +254,13 @@ If you previously installed a `link:` copy or an older version, **keep only one*
 |---|---|
 | ![Light](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-light.png) | ![Dark](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-dark.png) |
 
-| Unread | Empty state |
+| Unread | Needs input |
 |---|---|
-| ![Unread](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/unread-tab.png) | ![Empty](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/empty.png) |
+| ![Unread](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/unread-tab.png) | ![Needs input](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/needs-input.png) |
+
+Empty state:
+
+![Empty](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/empty.png)
 
 English UI (follows the host language):
 
@@ -261,7 +271,7 @@ English UI (follows the host language):
 ### Development
 
 ```bash
-npm test              # node:test, 46 cases (security boundaries + zh/en dictionary parity)
+npm test              # node:test, 52 cases (security boundaries + zh/en dictionary parity)
 npm run preview       # local preview page (real client.js + mock data)
 npm run screenshot    # regenerate preview/screenshots/*.png
 ```

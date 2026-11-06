@@ -18,7 +18,7 @@
       查询参数：
         ?state=filled|empty          filled：2 个运行中 + 3 个已完成未读 + 2 个已读
         ?theme=light|dark            切换 html[data-ds-dark-theme] 与 token 兜底
-        ?tab=unread|running|idle|all 挂载后点击对应 Tab
+        ?tab=input|unread|running|idle|all 挂载后点击对应 Tab
         ?locale=zh|en                fake ctx.locale 的界面语言（默认 zh）
         ?focus=tab                   把焦点放在当前 Tab 上（截图用）
         ?debug=1                     显示预览调试信息（顶部状态 chip + 底部署名）；
@@ -70,6 +70,7 @@
         --dsw-alias-state-error-secondary: #f25a5a;
         --dsw-alias-state-warn-primary: #f59e0b;
         --dsw-alias-state-warn-label: #dd8629;
+        --dsw-alias-state-warn-tertiary: #fef5e7;
         --dsw-alias-state-idle-primary: #d4d4d4;
         --dsw-alias-interactive-bg-hover: #2631480f;
         --dsw-alias-interactive-bg-active: #2631481a;
@@ -119,6 +120,7 @@
         --dsw-alias-state-error-secondary: #f25a5a;
         --dsw-alias-state-warn-primary: #f59e0b;
         --dsw-alias-state-warn-label: #dd8629;
+        --dsw-alias-state-warn-tertiary: #27241f;
         --dsw-alias-state-idle-primary: #545557;
         --dsw-alias-interactive-bg-hover: #ffffff14;
         --dsw-alias-interactive-bg-active: #ffffff24;
@@ -549,7 +551,7 @@
         var stateName = params.get("state") === "empty" ? "empty" : "filled";
         var theme = params.get("theme") === "dark" ? "dark" : "light";
         var rawTab = params.get("tab");
-        var tabParam = ["unread", "running", "idle", "all"].indexOf(rawTab) >= 0 ? rawTab : null;
+        var tabParam = ["input", "unread", "running", "idle", "all"].indexOf(rawTab) >= 0 ? rawTab : null;
         var focusTab = params.get("focus") === "tab";
         var debugChrome = params.get("debug") === "1";
         // fake ctx.locale 的 active 语言：默认中文，?locale=en 切英文（第 6 张截图）。
@@ -656,6 +658,16 @@
         var bootNow = Date.now();
         var seedTasks = function () {
           return [
+            {
+              id: "sess-1031",
+              title: "确认是否覆盖线上数据",
+              running: true,
+              needsInput: true,
+              inputKind: "question",
+              unread: false,
+              changeAt: bootNow - 20 * 1000,
+              completedAt: null,
+            },
             {
               id: "sess-1024",
               title: "重构通知去重逻辑",
@@ -1020,7 +1032,7 @@
         }
 
         function selectTab(tab) {
-          var order = { unread: 0, running: 1, idle: 2, all: 3 };
+          var order = { input: 0, unread: 1, running: 2, idle: 3, all: 4 };
           var buttons = document.querySelectorAll(".dtn-tab");
           var target = buttons[order[tab]];
           if (!target) return false;
@@ -1031,7 +1043,7 @@
         }
 
         function focusActiveTab(tab) {
-          var order = { unread: 0, running: 1, idle: 2, all: 3 };
+          var order = { input: 0, unread: 1, running: 2, idle: 3, all: 4 };
           var buttons = document.querySelectorAll(".dtn-tab");
           var target = buttons[order[tab]];
           if (target && typeof target.focus === "function") target.focus();
