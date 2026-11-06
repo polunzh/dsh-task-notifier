@@ -354,4 +354,23 @@ test("长轮询在 rev 变化后立即返回", async () => {
   assert.equal(response.status, 200);
   assert.ok(Date.now() - started < 3_000);
   assert.equal(typeof response.json.rev, "number");
+
+  // 挂起中的长轮询必须能被 rev 变化叫醒：等待器不能 unref，否则事件循环先空掉，
+  // Promise 永远不结算（CI 上就是这么挂的）。
+  const before = await harness.call({ method: "GET", url: "/task-notifier/api/state" });
+  const waiting = harness.call({ method: "GET", url: `/task-notifier/api/wait?rev=${before.json.rev}` });
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  const woke = Date.now();
+  harness.handlers.get("api-session/status")("sess-wait", true);
+  const woken = await waiting;
+  assert.ok(woken.json.rev > before.json.rev, "rev 变化后必须换一个新 rev 返回");
+  assert.ok(Date.now() - woke < 1_000, "应当在一次轮询间隔内被叫醒");
+});
+
+test("长轮询的等待器不能 unref（否则事件循环先空掉，Promise 永不结算）", () => {
+  const source = readFileSync(new URL("../lib/index.js", import.meta.url), "utf8");
+  const start = source.indexOf("function waitForRevision");
+  const end = source.indexOf("function runTestNotification");
+  assert.ok(start > 0 && end > start, "waitForRevision 应当还在");
+  assert.equal(/\.unref\(/.test(source.slice(start, end)), false);
 });
