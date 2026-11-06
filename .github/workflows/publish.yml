@@ -18,14 +18,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-          cache: npm
+          # 本包零运行时依赖、也没有 lockfile，开 npm 缓存会让 setup-node 直接报
+          # "Dependencies lock file is not found" 并中断整个 job。
 
       - name: Run tests
         run: npm test
