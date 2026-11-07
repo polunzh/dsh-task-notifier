@@ -1,0 +1,1317 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>方向 B：控制台 / Control Room · 任务面板</title>
+    <link rel="stylesheet" href="_tokens.css" />
+    <style>
+      /* ==========================================================================
+         控制台 / Control Room（双栏宽屏架构）
+         设计特征：
+         1. 「待回复 / 运行中 / 已完成未读」同屏全景呈现，彻底破除单 Tab 切换盲区
+         2. 精密运维控制台美学：浅色清爽、高对比度层级、细腻阴影、微质感遥测条
+         3. 关键动作（全部标为已读、决策响应）拥有鲜明第一层级，告别单调纯白细框
+         ========================================================================== */
+
+      body {
+        background: #f6f7f9;
+        color: var(--ink);
+        height: 100vh;
+        margin: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+
+      /* 限制宽屏容器，防止在 3254px 视口下横向拉爆 */
+      .cr-shell {
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 24px 32px 36px;
+        box-sizing: border-box;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      /* --------------------------------------------------------------------------
+         页头区域：品牌 Eyebrow + 标题 + 动作组
+         -------------------------------------------------------------------------- */
+      .cr-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      .cr-brand {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .cr-eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: var(--ds-font-family-code);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+      }
+
+      .cr-live-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 10.5px;
+        font-weight: 500;
+        letter-spacing: 0.03em;
+        padding: 1.5px 8px;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: var(--blue-ink);
+        border: 1px solid var(--blue-line);
+      }
+
+      .cr-live-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--dsw-alias-state-business-primary);
+        position: relative;
+      }
+
+      .cr-live-dot::after {
+        content: "";
+        position: absolute;
+        inset: -2px;
+        border-radius: 50%;
+        border: 1px solid var(--dsw-alias-state-business-primary);
+        animation: cr-pulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+      }
+
+      @keyframes cr-pulse {
+        0% { transform: scale(0.9); opacity: 0.9; }
+        70% { transform: scale(2.2); opacity: 0; }
+        100% { transform: scale(2.2); opacity: 0; }
+      }
+
+      .cr-title-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .cr-title {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 650;
+        letter-spacing: -0.025em;
+        color: var(--ink);
+        line-height: 1.25;
+      }
+
+      .cr-badge-arch {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--ink-2);
+        background: #ffffff;
+        border: 1px solid var(--hairline);
+        padding: 2.5px 8px;
+        border-radius: 6px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+      }
+
+      .cr-subtitle {
+        margin: 0;
+        font-size: 13px;
+        color: var(--ink-2);
+        line-height: 1.5;
+      }
+
+      /* 动作栏：有层次的按钮体系，告别平淡细框 */
+      .cr-actions {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        flex-wrap: wrap;
+      }
+
+      /* 浏览器通知状态开关：高辨识度药丸胶囊 */
+      .cr-btn-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 35px;
+        padding: 0 14px;
+        border-radius: 999px;
+        font-size: 12.5px;
+        font-weight: 500;
+        background: #ffffff;
+        color: var(--ink);
+        border: 1px solid var(--hairline);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+        transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+      }
+
+      .cr-btn-toggle:hover {
+        background: #fafbfc;
+        border-color: var(--dsw-alias-border-l3);
+      }
+
+      .cr-status-indicator {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--dsw-alias-state-success-primary);
+        box-shadow: 0 0 0 2.5px var(--green-tint);
+      }
+
+      /* 次要工具按钮：试听与试发 */
+      .cr-btn-tool {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 35px;
+        padding: 0 12px;
+        border-radius: 7px;
+        font-size: 12.5px;
+        font-weight: 500;
+        background: #ffffff;
+        color: var(--ink-2);
+        border: 1px solid var(--hairline);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+        transition: all 0.15s ease;
+      }
+
+      .cr-btn-tool:hover {
+        background: #f1f3f5;
+        color: var(--ink);
+        border-color: var(--dsw-alias-border-l3);
+      }
+
+      /* 主操作按钮：全部标为已读（3）突出高权级 */
+      .cr-btn-primary {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 35px;
+        padding: 0 15px;
+        border-radius: 7px;
+        font-size: 12.5px;
+        font-weight: 600;
+        background: #16a34a;
+        color: #ffffff;
+        border: 1px solid #15803d;
+        box-shadow: 0 1px 2px rgba(22, 163, 74, 0.25), 0 2px 5px rgba(0, 0, 0, 0.05);
+        transition: all 0.15s ease;
+      }
+
+      .cr-btn-primary:hover {
+        background: #15803d;
+        box-shadow: 0 2px 6px rgba(22, 163, 74, 0.35);
+        transform: translateY(-0.5px);
+      }
+
+      /* --------------------------------------------------------------------------
+         控制台 HUD 遥测仪表栏 (Telemetry HUD Strip)
+         -------------------------------------------------------------------------- */
+      .cr-hud-bar {
+        background: #ffffff;
+        border: 1px solid var(--hairline);
+        border-radius: 10px;
+        padding: 6px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        box-shadow: var(--dsw-elevation-panel);
+      }
+
+      .cr-hud-metrics {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .cr-metric-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 12px;
+        border-radius: 6px;
+        font-size: 12.5px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.12s ease;
+        border: 1px solid transparent;
+      }
+
+      /* 三类状态分别有精致的遥测微底色，告别纯白 */
+      .cr-metric-chip.is-warn {
+        background: #fffbeb;
+        border-color: rgba(245, 158, 11, 0.35);
+        color: #b45309;
+        font-weight: 600;
+      }
+      .cr-metric-chip.is-warn:hover {
+        background: #fef3c7;
+        border-color: rgba(245, 158, 11, 0.5);
+      }
+
+      .cr-metric-chip.is-blue {
+        background: #eff6ff;
+        border-color: rgba(65, 118, 230, 0.3);
+        color: #1d4ed8;
+      }
+      .cr-metric-chip.is-blue:hover {
+        background: #e0edff;
+        border-color: rgba(65, 118, 230, 0.45);
+      }
+
+      .cr-metric-chip.is-green {
+        background: #f0fdf4;
+        border-color: rgba(34, 197, 94, 0.32);
+        color: #15803d;
+      }
+      .cr-metric-chip.is-green:hover {
+        background: #dcfce7;
+        border-color: rgba(34, 197, 94, 0.48);
+      }
+
+      .cr-metric-chip.is-idle {
+        background: #f8f9fa;
+        border-color: var(--hairline);
+        color: var(--ink-2);
+      }
+      .cr-metric-chip.is-idle:hover {
+        background: #f1f3f5;
+        color: var(--ink);
+      }
+
+      .cr-chip-dot {
+        width: 6.5px;
+        height: 6.5px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .cr-chip-dot.warn {
+        background: var(--dsw-alias-state-warn-primary);
+        box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+      }
+      .cr-chip-dot.blue {
+        background: var(--dsw-alias-state-business-primary);
+        box-shadow: 0 0 0 2px rgba(65, 118, 230, 0.25);
+      }
+      .cr-chip-dot.green {
+        background: var(--dsw-alias-state-success-primary);
+        box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
+      }
+      .cr-chip-dot.idle {
+        background: #9ca3af;
+      }
+
+      .cr-chip-count {
+        font-family: var(--ds-font-family-code);
+        font-size: 11px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.05);
+      }
+      .is-warn .cr-chip-count {
+        background: rgba(245, 158, 11, 0.18);
+        color: #b45309;
+      }
+      .is-blue .cr-chip-count {
+        background: rgba(65, 118, 230, 0.14);
+        color: #1d4ed8;
+      }
+      .is-green .cr-chip-count {
+        background: rgba(34, 197, 94, 0.16);
+        color: #15803d;
+      }
+
+      .cr-hud-divider {
+        width: 1px;
+        height: 18px;
+        background: var(--hairline);
+        margin: 0 2px;
+      }
+
+      /* 搜索框：集成在控制台 HUD 栏右侧 */
+      .cr-search-box {
+        position: relative;
+        display: flex;
+        align-items: center;
+        width: 270px;
+      }
+
+      .cr-search-icon {
+        position: absolute;
+        left: 10px;
+        color: var(--ink-3);
+        pointer-events: none;
+      }
+
+      .cr-search-input {
+        width: 100%;
+        height: 33px;
+        padding: 0 34px 0 32px;
+        background: #f4f5f7;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 12.5px;
+        color: var(--ink);
+        outline: none;
+        transition: all 0.15s ease;
+      }
+
+      .cr-search-input:focus {
+        background: #ffffff;
+        border-color: var(--dsw-focus-ring-color);
+        box-shadow: 0 0 0 2.5px var(--blue-tint);
+      }
+
+      .cr-search-input::placeholder {
+        color: var(--ink-3);
+      }
+
+      .cr-kbd {
+        position: absolute;
+        right: 8px;
+        font-family: var(--ds-font-family-code);
+        font-size: 10px;
+        color: var(--ink-3);
+        background: #ffffff;
+        border: 1px solid var(--hairline);
+        border-radius: 4px;
+        padding: 1.5px 4.5px;
+        line-height: 1.2;
+        pointer-events: none;
+      }
+
+      /* --------------------------------------------------------------------------
+         主双栏网格 (Main Two-Column Grid)
+         左栏: 主工作流 (待回复卡片 + 已完成未读列表) 约 1.4fr
+         右栏: 旁路雷达 (运行中监控 + 最近完成紧凑归档) 约 390px
+         -------------------------------------------------------------------------- */
+      .cr-grid {
+        display: grid;
+        grid-template-columns: 1.4fr 390px;
+        gap: 18px;
+        align-items: start;
+      }
+
+      /* --------------------------------------------------------------------------
+         左主栏：需要你处理 (Action Required)
+         -------------------------------------------------------------------------- */
+      .cr-left-col {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      /* 待回复卡片：最高视觉警觉度 (Amber Urgent Card) */
+      .cr-urgent-card {
+        background: #ffffff;
+        border: 1px solid rgba(245, 158, 11, 0.35);
+        border-left: 4.5px solid var(--dsw-alias-state-warn-primary);
+        border-radius: 10px;
+        padding: 18px 22px;
+        box-shadow: 0 2px 10px rgba(245, 158, 11, 0.08), 0 1px 3px rgba(0, 0, 0, 0.03);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .cr-urgent-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 140px;
+        height: 140px;
+        background: radial-gradient(circle, rgba(245, 158, 11, 0.08) 0%, transparent 70%);
+        pointer-events: none;
+      }
+
+      .cr-urgent-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+
+      .cr-urgent-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11.5px;
+        font-weight: 650;
+        color: #b45309;
+        background: #fef3c7;
+        border: 1px solid #fde68a;
+        padding: 3px 10px;
+        border-radius: 5px;
+        letter-spacing: 0.02em;
+      }
+
+      .cr-urgent-pulse {
+        width: 6.5px;
+        height: 6.5px;
+        border-radius: 50%;
+        background: var(--dsw-alias-state-warn-primary);
+        box-shadow: 0 0 0 2.5px rgba(245, 158, 11, 0.35);
+        animation: cr-pulse 1.8s infinite;
+      }
+
+      .cr-urgent-time {
+        font-family: var(--ds-font-family-code);
+        font-size: 11.5px;
+        color: var(--ink-3);
+      }
+
+      .cr-urgent-title {
+        font-size: 16.5px;
+        font-weight: 650;
+        color: var(--ink);
+        margin: 0 0 9px;
+        line-height: 1.35;
+      }
+
+      .cr-urgent-banner {
+        background: #fffcf5;
+        border: 1px dashed rgba(245, 158, 11, 0.4);
+        border-radius: 6px;
+        padding: 10px 14px;
+        font-size: 12.5px;
+        color: #78350f;
+        line-height: 1.55;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+      }
+
+      .cr-urgent-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .cr-btn-decision {
+        height: 33px;
+        padding: 0 15px;
+        border-radius: 6px;
+        font-size: 12.5px;
+        font-weight: 600;
+        background: #d97706;
+        color: #ffffff;
+        border: 1px solid #b45309;
+        box-shadow: 0 1px 2px rgba(180, 83, 9, 0.25);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s ease;
+      }
+
+      .cr-btn-decision:hover {
+        background: #b45309;
+        transform: translateY(-0.5px);
+      }
+
+      .cr-btn-secondary {
+        height: 33px;
+        padding: 0 13px;
+        border-radius: 6px;
+        font-size: 12.5px;
+        font-weight: 500;
+        background: #ffffff;
+        color: var(--ink-2);
+        border: 1px solid var(--hairline);
+        transition: all 0.15s ease;
+      }
+
+      .cr-btn-secondary:hover {
+        background: #f4f5f7;
+        color: var(--ink);
+      }
+
+      /* 已完成未读模块 (Finished Unread List) */
+      .cr-panel {
+        background: #ffffff;
+        border: 1px solid var(--hairline);
+        border-radius: 10px;
+        box-shadow: var(--dsw-elevation-panel);
+        overflow: hidden;
+      }
+
+      .cr-panel-head {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--hairline);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #fafbfc;
+      }
+
+      .cr-panel-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .cr-panel-title {
+        margin: 0;
+        font-size: 13.5px;
+        font-weight: 650;
+        color: var(--ink);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .cr-pill-count {
+        font-family: var(--ds-font-family-code);
+        font-size: 11px;
+        font-weight: 700;
+        padding: 1px 7px;
+        border-radius: 999px;
+      }
+      .cr-pill-count.green {
+        background: var(--green-tint);
+        color: var(--green-ink);
+        border: 1px solid var(--green-line);
+      }
+      .cr-pill-count.blue {
+        background: var(--blue-tint);
+        color: var(--blue-ink);
+        border: 1px solid var(--blue-line);
+      }
+
+      .cr-panel-subtitle {
+        font-size: 11.5px;
+        color: var(--ink-3);
+      }
+
+      /* 任务列表条目 (Unread Task Row) */
+      .cr-task-list {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .cr-task-item {
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--dsw-alias-border-l1);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        transition: background-color 0.12s ease;
+      }
+
+      .cr-task-item:last-child {
+        border-bottom: none;
+      }
+
+      .cr-task-item:hover {
+        background: #fbfcfd;
+      }
+
+      .cr-task-main {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        min-width: 0;
+        flex: 1;
+      }
+
+      .cr-unread-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--dsw-alias-state-success-primary);
+        box-shadow: 0 0 0 3px var(--green-tint);
+        margin-top: 6px;
+        flex-shrink: 0;
+      }
+
+      .cr-task-content {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .cr-task-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--ink);
+        margin: 0 0 4px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .cr-task-title:hover {
+        color: var(--blue-ink);
+        cursor: pointer;
+      }
+
+      .cr-task-meta {
+        font-size: 12px;
+        color: var(--ink-3);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .cr-task-meta span {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .cr-tag-subtle {
+        font-size: 10.5px;
+        padding: 1px 6px;
+        border-radius: 4px;
+        background: #f3f4f6;
+        color: var(--ink-2);
+        border: 1px solid var(--hairline);
+      }
+
+      .cr-task-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+
+      .cr-btn-ghost {
+        height: 29px;
+        padding: 0 11px;
+        border-radius: 5px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--ink-2);
+        background: transparent;
+        border: 1px solid var(--hairline);
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        transition: all 0.12s ease;
+      }
+
+      .cr-btn-ghost:hover {
+        background: #f0fdf4;
+        border-color: var(--green-line);
+        color: var(--green-ink);
+      }
+
+      .cr-btn-ghost.is-open:hover {
+        background: #eff6ff;
+        border-color: var(--blue-line);
+        color: var(--blue-ink);
+      }
+
+      /* --------------------------------------------------------------------------
+         右侧栏：旁路雷达与活跃进程 (In Flight & Archive)
+         -------------------------------------------------------------------------- */
+      .cr-right-col {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      /* 运行中卡片：富有活性感 (Blue In-Flight Widget) */
+      .cr-running-card {
+        background: #ffffff;
+        border: 1px solid var(--hairline);
+        border-radius: 10px;
+        box-shadow: var(--dsw-elevation-panel);
+        overflow: hidden;
+      }
+
+      .cr-running-head {
+        padding: 13px 18px;
+        background: #f8fbff;
+        border-bottom: 1px solid rgba(65, 118, 230, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .cr-running-title {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 650;
+        color: var(--blue-ink);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .cr-radar-badge {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--blue-ink);
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .cr-radar-wave {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--dsw-alias-state-business-primary);
+        animation: cr-pulse 1.8s infinite;
+      }
+
+      .cr-running-list {
+        padding: 4px 0;
+      }
+
+      .cr-running-item {
+        padding: 15px 18px;
+        border-bottom: 1px solid var(--dsw-alias-border-l1);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .cr-running-item:last-child {
+        border-bottom: none;
+      }
+
+      .cr-running-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .cr-running-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--ink);
+        line-height: 1.35;
+      }
+
+      .cr-running-time {
+        font-family: var(--ds-font-family-code);
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--blue-ink);
+        background: #eff6ff;
+        border: 1px solid rgba(65, 118, 230, 0.2);
+        padding: 1.5px 7px;
+        border-radius: 4px;
+        white-space: nowrap;
+      }
+
+      .cr-running-detail {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11.5px;
+        color: var(--ink-2);
+      }
+
+      .cr-spinner {
+        animation: cr-spin 1.2s linear infinite;
+        color: var(--dsw-alias-state-business-primary);
+      }
+
+      @keyframes cr-spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* 微进度条 */
+      .cr-progress-track {
+        height: 4px;
+        background: #edf2f7;
+        border-radius: 999px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .cr-progress-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #60a5fa, #3b82f6);
+      }
+
+      .cr-progress-indeterminate {
+        width: 40%;
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+        animation: cr-indeterminate 1.8s infinite ease-in-out;
+      }
+
+      @keyframes cr-indeterminate {
+        0% { left: -40%; }
+        100% { left: 100%; }
+      }
+
+      /* 最近完成已读 (Archive / Read Tasks) */
+      .cr-archive-card {
+        background: #ffffff;
+        border: 1px solid var(--hairline);
+        border-radius: 10px;
+        box-shadow: var(--dsw-elevation-panel);
+        overflow: hidden;
+      }
+
+      .cr-archive-head {
+        padding: 12px 18px;
+        background: #fafbfc;
+        border-bottom: 1px solid var(--hairline);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .cr-archive-title {
+        margin: 0;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--ink-2);
+      }
+
+      .cr-archive-item {
+        padding: 12px 18px;
+        border-bottom: 1px solid var(--dsw-alias-border-l1);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .cr-archive-item:last-child {
+        border-bottom: none;
+      }
+
+      .cr-archive-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .cr-archive-icon {
+        color: #9ca3af;
+        flex-shrink: 0;
+      }
+
+      .cr-archive-name {
+        font-size: 12.5px;
+        color: var(--ink-2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .cr-archive-time {
+        font-family: var(--ds-font-family-code);
+        font-size: 11px;
+        color: var(--ink-3);
+        flex-shrink: 0;
+      }
+
+      /* 底部系统遥测状态脚标 (Telemetry Diagnostics) */
+      .cr-telemetry-box {
+        background: #ffffff;
+        border: 1px solid var(--hairline);
+        border-radius: 9px;
+        padding: 12px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+      }
+
+      .cr-telemetry-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 11.5px;
+        color: var(--ink-3);
+      }
+
+      .cr-telemetry-val {
+        font-family: var(--ds-font-family-code);
+        font-size: 11px;
+        color: var(--ink-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .cr-dot-mini {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--dsw-alias-state-success-primary);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="cr-shell">
+      <!-- ==================== 顶部页头与动作区 ==================== -->
+      <header class="cr-header">
+        <div class="cr-brand">
+          <div class="cr-eyebrow">
+            <span>TASK NOTIFIER</span>
+            <span class="cr-live-pill">
+              <span class="cr-live-dot"></span>
+              长轮询保持
+            </span>
+          </div>
+          <div class="cr-title-row">
+            <h1 class="cr-title">任务面板</h1>
+            <span class="cr-badge-arch">控制台双栏视图</span>
+          </div>
+          <p class="cr-subtitle">
+            筛选待回复、进行中与已完成未读的任务；任务完成时播放提示音并弹通知。
+          </p>
+        </div>
+
+        <div class="cr-actions">
+          <!-- 浏览器通知状态：高辨识度药丸胶囊 -->
+          <button class="cr-btn-toggle" type="button" title="点击切换桌面通知权限">
+            <span class="cr-status-indicator"></span>
+            <span>浏览器通知：已开启</span>
+          </button>
+
+          <!-- 试听与试发工具按钮 -->
+          <button class="cr-btn-tool" type="button" title="测试声音提示">
+            <svg class="ico" viewBox="0 0 24 24">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+            </svg>
+            <span>试听提示音</span>
+          </button>
+
+          <button class="cr-btn-tool" type="button" title="测试系统桌面通知">
+            <svg class="ico" viewBox="0 0 24 24">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+            <span>试发系统通知</span>
+          </button>
+
+          <!-- 主操作按钮：全部标为已读（3） -->
+          <button class="cr-btn-primary" type="button" title="批量将所有未读任务标记为已读">
+            <svg class="ico" viewBox="0 0 24 24">
+              <path d="M18 6 7 17l-5-5"></path>
+              <path d="m22 10-7.5 7.5L13 16"></path>
+            </svg>
+            <span>全部标为已读（3）</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- ==================== 控制台 HUD 遥测仪表栏 ==================== -->
+      <nav class="cr-hud-bar" aria-label="任务状态总览与快速筛选">
+        <div class="cr-hud-metrics">
+          <button class="cr-metric-chip is-warn" type="button" title="查看待审批任务">
+            <span class="cr-chip-dot warn"></span>
+            <span>待回复</span>
+            <span class="cr-chip-count mono">1</span>
+          </button>
+
+          <button class="cr-metric-chip is-blue" type="button" title="查看运行中任务">
+            <span class="cr-chip-dot blue"></span>
+            <span>运行中</span>
+            <span class="cr-chip-count mono">2</span>
+          </button>
+
+          <button class="cr-metric-chip is-green" type="button" title="查看已完成未读任务">
+            <span class="cr-chip-dot green"></span>
+            <span>已完成未读</span>
+            <span class="cr-chip-count mono">3</span>
+          </button>
+
+          <span class="cr-hud-divider"></span>
+
+          <button class="cr-metric-chip is-idle" type="button" title="查看所有任务">
+            <span class="cr-chip-dot idle"></span>
+            <span>全部任务</span>
+            <span class="cr-chip-count mono">8</span>
+          </button>
+        </div>
+
+        <div class="cr-search-box">
+          <svg class="ico cr-search-icon" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.3-4.3"></path>
+          </svg>
+          <input
+            type="text"
+            class="cr-search-input"
+            placeholder="按标题搜索…"
+            aria-label="按标题搜索任务"
+          />
+          <kbd class="cr-kbd mono">⌘K</kbd>
+        </div>
+      </nav>
+
+      <!-- ==================== 主双栏架构 ==================== -->
+      <main class="cr-grid">
+        <!-- 左主栏：需要你处理 (1.4fr) -->
+        <section class="cr-left-col" aria-label="需要你处理的任务">
+          <!-- 待回复卡片：醒目琥珀色决策专区 -->
+          <article class="cr-urgent-card">
+            <div class="cr-urgent-header">
+              <div class="cr-urgent-tag">
+                <span class="cr-urgent-pulse"></span>
+                <span>等你决定 · 等待审批</span>
+              </div>
+              <span class="cr-urgent-time mono">刚刚（20 秒）</span>
+            </div>
+
+            <h2 class="cr-urgent-title">确认是否覆盖线上数据</h2>
+
+            <div class="cr-urgent-banner">
+              <svg class="ico" style="color: #b45309; margin-top: 1px" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <div>
+                <strong>操作拦截提示：</strong>目标生产数据库包含 1,420 条活跃结构快照，当前迁移任务需要您明确核准执行权限。
+              </div>
+            </div>
+
+            <div class="cr-urgent-actions">
+              <button class="cr-btn-decision" type="button">
+                <svg class="ico" viewBox="0 0 24 24">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>立即审批并执行</span>
+              </button>
+              <button class="cr-btn-secondary" type="button">拒绝操作</button>
+              <button class="cr-btn-secondary" type="button">查看 Diff 详情</button>
+            </div>
+          </article>
+
+          <!-- 已完成未读列表 (3 项) -->
+          <section class="cr-panel" aria-label="已完成未读任务列表">
+            <div class="cr-panel-head">
+              <div class="cr-panel-title-wrap">
+                <h3 class="cr-panel-title">
+                  <svg class="ico" style="color: var(--dsw-alias-state-success-primary)" viewBox="0 0 24 24">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                  </svg>
+                  <span>已完成未读</span>
+                  <span class="cr-pill-count green mono">3</span>
+                </h3>
+              </div>
+              <span class="cr-panel-subtitle">任务已就绪 · 点击直接进入对应会话</span>
+            </div>
+
+            <div class="cr-task-list">
+              <!-- 未读任务 1 -->
+              <div class="cr-task-item">
+                <div class="cr-task-main">
+                  <span class="cr-unread-dot" title="未读状态"></span>
+                  <div class="cr-task-content">
+                    <div class="cr-task-title">
+                      <span>整理会议纪要</span>
+                      <span class="cr-tag-subtle">会话产物</span>
+                    </div>
+                    <div class="cr-task-meta">
+                      <span class="mono">
+                        <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        2 分钟前
+                      </span>
+                      <span>耗时 42s · 提炼 3 个核心决策点与待办责任人</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="cr-task-actions">
+                  <button class="cr-btn-ghost" type="button" title="将此任务标为已读">
+                    <svg class="ico" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    <span>标为已读</span>
+                  </button>
+                  <button class="cr-btn-ghost is-open" type="button" title="打开此会话">
+                    <span>打开</span>
+                    <svg class="ico" viewBox="0 0 24 24"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 未读任务 2 -->
+              <div class="cr-task-item">
+                <div class="cr-task-main">
+                  <span class="cr-unread-dot" title="未读状态"></span>
+                  <div class="cr-task-content">
+                    <div class="cr-task-title">
+                      <span>修复移动端侧栏折叠</span>
+                      <span class="cr-tag-subtle">代码修改</span>
+                    </div>
+                    <div class="cr-task-meta">
+                      <span class="mono">
+                        <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        12 分钟前
+                      </span>
+                      <span>耗时 1m 24s · 涉及 apps/web/sidebar.tsx</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="cr-task-actions">
+                  <button class="cr-btn-ghost" type="button" title="将此任务标为已读">
+                    <svg class="ico" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    <span>标为已读</span>
+                  </button>
+                  <button class="cr-btn-ghost is-open" type="button" title="打开此会话">
+                    <span>打开</span>
+                    <svg class="ico" viewBox="0 0 24 24"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 未读任务 3 -->
+              <div class="cr-task-item">
+                <div class="cr-task-main">
+                  <span class="cr-unread-dot" title="未读状态"></span>
+                  <div class="cr-task-content">
+                    <div class="cr-task-title">
+                      <span>补齐插件市场截图</span>
+                      <span class="cr-tag-subtle">媒体生成</span>
+                    </div>
+                    <div class="cr-task-meta">
+                      <span class="mono">
+                        <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        58 分钟前
+                      </span>
+                      <span>耗时 3m 10s · 已输出 6 张高分辨率视网膜图</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="cr-task-actions">
+                  <button class="cr-btn-ghost" type="button" title="将此任务标为已读">
+                    <svg class="ico" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    <span>标为已读</span>
+                  </button>
+                  <button class="cr-btn-ghost is-open" type="button" title="打开此会话">
+                    <span>打开</span>
+                    <svg class="ico" viewBox="0 0 24 24"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <!-- 右侧栏：旁路雷达与活跃进程 (390px) -->
+        <aside class="cr-right-col" aria-label="运行中与历史记录">
+          <!-- 运行中面板 (In-Flight Live Radar) -->
+          <section class="cr-running-card" aria-label="运行中任务">
+            <div class="cr-running-head">
+              <h3 class="cr-running-title">
+                <svg class="ico cr-spinner" viewBox="0 0 24 24">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                </svg>
+                <span>运行中</span>
+                <span class="cr-pill-count blue mono">2</span>
+              </h3>
+              <span class="cr-radar-badge">
+                <span class="cr-radar-wave"></span>
+                活性监测中
+              </span>
+            </div>
+
+            <div class="cr-running-list">
+              <!-- 运行中 1 -->
+              <div class="cr-running-item">
+                <div class="cr-running-top">
+                  <span class="cr-running-name">重构通知去重逻辑</span>
+                  <span class="cr-running-time mono">42 秒前</span>
+                </div>
+                <div class="cr-running-detail">
+                  <span class="mono">Step 3/5: 执行单元测试套件…</span>
+                </div>
+                <div class="cr-progress-track">
+                  <div class="cr-progress-indeterminate"></div>
+                </div>
+              </div>
+
+              <!-- 运行中 2 -->
+              <div class="cr-running-item">
+                <div class="cr-running-top">
+                  <span class="cr-running-name">抓取竞品价格快照</span>
+                  <span class="cr-running-time mono">3 分钟前</span>
+                </div>
+                <div class="cr-running-detail">
+                  <span class="mono">已抓取 18/24 页面 · 吞吐率 1.2 req/s</span>
+                </div>
+                <div class="cr-progress-track">
+                  <div class="cr-progress-fill" style="width: 75%"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 最近完成已读 (Archive List) -->
+          <section class="cr-archive-card" aria-label="已读归档">
+            <div class="cr-archive-head">
+              <h4 class="cr-archive-title">已读完成记录</h4>
+              <span class="mono" style="font-size: 11px; color: var(--ink-3)">2 项</span>
+            </div>
+            <div class="cr-archive-item">
+              <div class="cr-archive-left">
+                <svg class="ico cr-archive-icon" viewBox="0 0 24 24">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span class="cr-archive-name" title="写好 README 安装说明">写好 README 安装说明</span>
+              </div>
+              <span class="cr-archive-time mono">3 小时前</span>
+            </div>
+
+            <div class="cr-archive-item">
+              <div class="cr-archive-left">
+                <svg class="ico cr-archive-icon" viewBox="0 0 24 24">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span class="cr-archive-name" title="整理发布检查清单">整理发布检查清单</span>
+              </div>
+              <span class="cr-archive-time mono">昨天</span>
+            </div>
+          </section>
+
+          <!-- 控制台遥测状态小部件 -->
+          <footer class="cr-telemetry-box">
+            <div class="cr-telemetry-row">
+              <span>桌面通知通道</span>
+              <span class="cr-telemetry-val">
+                <span class="cr-dot-mini"></span>
+                原生系统权限正常
+              </span>
+            </div>
+            <div class="cr-telemetry-row">
+              <span>音效触发机制</span>
+              <span class="cr-telemetry-val mono">Web Audio API</span>
+            </div>
+            <div class="cr-telemetry-row">
+              <span>后台事件流延时</span>
+              <span class="cr-telemetry-val mono">&lt; 18ms</span>
+            </div>
+          </footer>
+        </aside>
+      </main>
+    </div>
+  </body>
+</html>

@@ -13,7 +13,7 @@
 
 ## 中文
 
-> DeepSeek Harness（DSH）Web 插件：**任务完成时提醒你**，并给你一个能筛选「待回复 / 已完成未读」的任务面板。
+> DeepSeek Harness（DSH）Web 插件：**任务完成时提醒你**，并提供一屏同时展示「待回复 / 运行中 / 已完成未读」的三列看板任务面板。
 
 ### 它解决什么
 
@@ -23,8 +23,8 @@ DSH 跑长任务时，你切走去干别的，回来才发现早就跑完了。�
 - **通知双通道**：
   - 页面开着且已授权 → 浏览器 `Notification`，点一下跳回对应会话；
   - 页面关了或未授权 → 宿主在 macOS 上弹系统通知（`osascript`），不会双弹（心跳判重）。
-- **待回复状态**：Agent 向你提问、等你审阅计划或等你审批时，侧栏图标亮起琥珀色脉冲点，面板新增「待回复」分类，点开直接回到那个等你决定的会话。
-- **任务面板**：侧边栏图标（带未读角标）→ 五个筛选：**待回复 / 已完成未读 / 运行中 / 已完成 / 全部**，支持按标题搜索、全部标为已读、试听提示音、试发系统通知。
+- **待回复状态**：Agent 向你提问、等你审阅计划或等你审批时，侧栏图标亮起琥珀色脉冲点，面板「待回复」列置顶提示，点开直接回到那个等你决定的会话。
+- **三列看板面板**：侧边栏图标（带未读角标）→ 一屏同时看到**待回复 / 运行中 / 已完成未读**三列，顶部 chip 可单独筛选单列，底部「更早完成」可展开历史；支持按标题搜索、全部标为已读、试听提示音、试发系统通知。
 - **未读不丢**：状态写在 `$DSH_HOME/storages/dsh-task-notifier/state.json`，重启后还在。
 - **中英双语**：界面与系统通知文案跟随宿主语言（zh / en）。
 
@@ -110,13 +110,21 @@ dsh plugin --profile desktop add @polunzh/dsh-task-notifier
 
 ### 截图
 
-| 浅色 | 深色 |
+| 浅色看板 | 深色看板 |
 |---|---|
-| ![浅色](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-light.png) | ![深色](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-dark.png) |
+| ![浅色看板](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-light.png) | ![深色看板](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-dark.png) |
 
-| 已完成未读 | 待回复 |
+| 已完成未读（单列筛选） | 待回复（单列筛选） |
 |---|---|
-| ![未读](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/unread-tab.png) | ![待回复](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/needs-input.png) |
+| ![已完成未读](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/unread-tab.png) | ![待回复](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/needs-input.png) |
+
+| 宽屏收敛（1920×1080） | 移动端响应式（390×844） |
+|---|---|
+| ![宽屏收敛](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/wide.png) | ![移动端响应式](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/mobile.png) |
+
+压测看板（长标题截断与多任务高度自适应）：
+
+![压测看板](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/busy.png)
 
 空状态：
 
@@ -152,7 +160,7 @@ preview/       预览页与截图（不进 npm 包）
 <a id="english"></a>
 ## English
 
-> A DeepSeek Harness (DSH) web plugin that **notifies you when a task finishes** and gives you a Tasks panel that surfaces sessions waiting on your input alongside completed-but-unread ones.
+> A DeepSeek Harness (DSH) web plugin that **notifies you when a task finishes** and gives you a 3-lane kanban Tasks panel displaying sessions waiting on your input, running, and completed-but-unread.
 
 ### What it solves
 
@@ -162,8 +170,8 @@ Long-running DSH sessions finish while you are looking somewhere else. This plug
 - **Two notification channels**:
   - Page open and permission granted → browser `Notification`; clicking it jumps back to that session.
   - Page closed or permission not granted → the host raises a macOS system notification (`osascript`). A heartbeat keeps the two channels from double-firing.
-- **Needs-input state** — when an agent asks you a question, waits for a plan review, or waits on an approval, the sidebar icon shows an amber pulsing dot and the panel gains a **Needs input** filter, so you can jump straight to the session that is blocked on you.
-- **Tasks panel** — a sidebar icon with an unread badge and five filters: **needs input / unread / running / completed / all**, plus title search, mark-all-read, preview the chime and send a test notification.
+- **Needs-input state** — when an agent asks you a question, waits for a plan review, or waits on an approval, the sidebar icon shows an amber pulsing dot and the panel's **Needs input** lane highlights the session, so you can jump straight to the session blocked on you.
+- **Three-lane kanban panel** — a sidebar icon with an unread badge and three simultaneous lanes: **needs input / running / unread**, plus top chip filters for focusing on a single lane, collapsible history for earlier completed tasks, title search, mark-all-read, chime preview, and test notification.
 - **Unread survives restarts** — state lives in `$DSH_HOME/storages/dsh-task-notifier/state.json`.
 - **Bilingual UI** — interface and system-notification text follow the host language (zh / en).
 
@@ -254,9 +262,17 @@ If you previously installed a `link:` copy or an older version, **keep only one*
 |---|---|
 | ![Light](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-light.png) | ![Dark](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-dark.png) |
 
-| Unread | Needs input |
+| Unread (single lane filter) | Needs input (single lane filter) |
 |---|---|
 | ![Unread](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/unread-tab.png) | ![Needs input](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/needs-input.png) |
+
+| Wide screen (1920×1080 max-width) | Mobile responsive (390×844) |
+|---|---|
+| ![Wide](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/wide.png) | ![Mobile](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/mobile.png) |
+
+Stress test layout (long title truncation and multi-card flow):
+
+![Stress test](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/busy.png)
 
 Empty state:
 

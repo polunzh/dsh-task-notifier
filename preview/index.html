@@ -16,11 +16,12 @@
         5. 页内预览脚本                                   造假 ctx / fetch，挂载两个 slot
 
       查询参数：
-        ?state=filled|empty          filled：2 个运行中 + 3 个已完成未读 + 2 个已读
+        ?state=filled|empty|busy     filled：默认数据；empty：空数据；busy：12条压测数据
         ?theme=light|dark            切换 html[data-ds-dark-theme] 与 token 兜底
-        ?tab=input|unread|running|idle|all 挂载后点击对应 Tab
+        ?filter=input|running|unread 挂载后点击对应 .dtn-chip 切换单列筛选
+        ?archive=1                   挂载后点击 .dtn-archive__bar 展开历史
         ?locale=zh|en                fake ctx.locale 的界面语言（默认 zh）
-        ?focus=tab                   把焦点放在当前 Tab 上（截图用）
+        ?focus=tab                   聚焦当前筛选 chip（截图用）
         ?debug=1                     显示预览调试信息（顶部状态 chip + 底部署名）；
                                      默认隐藏，避免进入 README / marketplace 截图
     -->
@@ -548,20 +549,23 @@
         "use strict";
 
         var params = new URLSearchParams(window.location.search);
-        var stateName = params.get("state") === "empty" ? "empty" : "filled";
+        var rawState = params.get("state");
+        var stateName = rawState === "empty" ? "empty" : rawState === "busy" ? "busy" : "filled";
         var theme = params.get("theme") === "dark" ? "dark" : "light";
-        var rawTab = params.get("tab");
-        var tabParam = ["input", "unread", "running", "idle", "all"].indexOf(rawTab) >= 0 ? rawTab : null;
+        var rawFilter = params.get("filter");
+        var filterParam = ["input", "running", "unread"].indexOf(rawFilter) >= 0 ? rawFilter : null;
+        var archiveParam = params.get("archive") === "1";
         var focusTab = params.get("focus") === "tab";
         var debugChrome = params.get("debug") === "1";
-        // fake ctx.locale 的 active 语言：默认中文，?locale=en 切英文（第 6 张截图）。
+        // fake ctx.locale 的 active 语言：默认中文，?locale=en 切英文。
         var localeTag = params.get("locale") === "en" ? "en-US" : "zh-CN";
         var shellLang = localeTag.toLowerCase().indexOf("zh") === 0 ? "zh" : "en";
 
         var info = {
           state: stateName,
           theme: theme,
-          tab: tabParam || "unread",
+          filter: filterParam,
+          archive: archiveParam,
           react: window.React && window.React.version ? window.React.version : null,
           locale: localeTag,
           debug: debugChrome,
@@ -663,7 +667,7 @@
               title: "确认是否覆盖线上数据",
               running: true,
               needsInput: true,
-              inputKind: "question",
+              inputKind: "approval",
               unread: false,
               changeAt: bootNow - 20 * 1000,
               completedAt: null,
@@ -674,6 +678,7 @@
               running: true,
               unread: false,
               changeAt: bootNow - 42 * 1000,
+              startedAt: bootNow - 45 * 1000,
               completedAt: null,
             },
             {
@@ -682,6 +687,7 @@
               running: true,
               unread: false,
               changeAt: bootNow - 3 * 60 * 1000,
+              startedAt: bootNow - 4 * 60 * 1000,
               completedAt: null,
             },
             {
@@ -727,7 +733,122 @@
           ];
         };
 
-        var tasks = stateName === "empty" ? [] : seedTasks();
+        var busyTasks = function () {
+          return [
+            // 3 条待回复（含超长标题，测试折行与截断）
+            {
+              id: "busy-101",
+              title: "发布前完整安全审计与端到端回归测试流程确认以及跨平台环境变量配置核对（长标题测试超长换行截断处理）",
+              running: true,
+              needsInput: true,
+              inputKind: "approval",
+              unread: false,
+              changeAt: bootNow - 15 * 1000,
+              completedAt: null,
+            },
+            {
+              id: "busy-102",
+              title: "确认是否覆盖线上生产数据库只读从库镜像配置",
+              running: true,
+              needsInput: true,
+              inputKind: "question",
+              unread: false,
+              changeAt: bootNow - 2 * 60 * 1000,
+              completedAt: null,
+            },
+            {
+              id: "busy-103",
+              title: "架构迁移方案阶段二风险评估审阅",
+              running: true,
+              needsInput: true,
+              inputKind: "plan",
+              unread: false,
+              changeAt: bootNow - 8 * 60 * 1000,
+              completedAt: null,
+            },
+            // 4 条运行中
+            {
+              id: "busy-104",
+              title: "构建跨架构 Docker 镜像与多平台产物打包",
+              running: true,
+              unread: false,
+              changeAt: bootNow - 45 * 1000,
+              startedAt: bootNow - 45 * 1000,
+              completedAt: null,
+            },
+            {
+              id: "busy-105",
+              title: "执行基准性能压测脚本与吞吐量指标统计",
+              running: true,
+              unread: false,
+              changeAt: bootNow - 5 * 60 * 1000,
+              startedAt: bootNow - 5 * 60 * 1000,
+              completedAt: null,
+            },
+            {
+              id: "busy-106",
+              title: "全量会话历史向量化索引构建与同步",
+              running: true,
+              unread: false,
+              changeAt: bootNow - 18 * 60 * 1000,
+              startedAt: bootNow - 18 * 60 * 1000,
+              completedAt: null,
+            },
+            {
+              id: "busy-107",
+              title: "分析三方依赖许可证合规性与漏洞扫描",
+              running: true,
+              unread: false,
+              changeAt: bootNow - 35 * 60 * 1000,
+              startedAt: bootNow - 35 * 60 * 1000,
+              completedAt: null,
+            },
+            // 3 条已完成未读
+            {
+              id: "busy-108",
+              title: "整理本周发布说明与变更日志",
+              running: false,
+              unread: true,
+              changeAt: bootNow - 3 * 60 * 1000,
+              completedAt: bootNow - 3 * 60 * 1000,
+            },
+            {
+              id: "busy-109",
+              title: "修复桌面端高分屏下图标模糊的问题",
+              running: false,
+              unread: true,
+              changeAt: bootNow - 25 * 60 * 1000,
+              completedAt: bootNow - 25 * 60 * 1000,
+            },
+            {
+              id: "busy-110",
+              title: "自动生成英文本地化翻译词条与校对",
+              running: false,
+              unread: true,
+              changeAt: bootNow - 70 * 60 * 1000,
+              completedAt: bootNow - 70 * 60 * 1000,
+            },
+            // 2 条已读历史
+            {
+              id: "busy-111",
+              title: "初始化项目脚手架与代码规范检查",
+              running: false,
+              unread: false,
+              changeAt: bootNow - 4 * 60 * 60 * 1000,
+              completedAt: bootNow - 4 * 60 * 60 * 1000,
+            },
+            {
+              id: "busy-112",
+              title: "配置自动化集成流水线 Webhook",
+              running: false,
+              unread: false,
+              changeAt: bootNow - 28 * 60 * 60 * 1000,
+              completedAt: bootNow - 28 * 60 * 60 * 1000,
+            },
+          ];
+        };
+
+        var tasks = stateName === "empty" ? [] : stateName === "busy" ? busyTasks() : seedTasks();
         var settings = { sound: true };
         var rev = 1;
 
@@ -973,24 +1094,65 @@
             return;
           }
 
-          if (tabParam) {
-            selectTab(tabParam);
+          if (filterParam) {
+            var chip = document.querySelector('.dtn-chip[data-lane="' + filterParam + '"]');
+            if (chip) chip.click();
+            await sleep(140);
+            await nextPaint();
+          }
+          if (archiveParam) {
+            var archiveBar = document.querySelector(".dtn-archive__bar");
+            if (archiveBar) archiveBar.click();
             await sleep(140);
             await nextPaint();
           }
           if (focusTab) {
-            focusActiveTab(tabParam || "unread");
+            var targetChip =
+              document.querySelector('.dtn-chip[aria-pressed="true"]') ||
+              (filterParam ? document.querySelector('.dtn-chip[data-lane="' + filterParam + '"]') : null) ||
+              document.querySelector(".dtn-chip");
+            if (targetChip && typeof targetChip.focus === "function") targetChip.focus();
             await sleep(80);
           }
 
           info.notificationPermission =
             typeof Notification === "undefined" ? "unsupported" : Notification.permission;
-          info.tabs = Array.from(document.querySelectorAll(".dtn-tab")).map(function (node) {
-            return node.textContent.trim();
+          info.lanes = Array.from(document.querySelectorAll(".dtn-lane")).map(function (node) {
+            var nameNode = node.querySelector(".dtn-lane__name");
+            var countNode = node.querySelector(".dtn-lane__count");
+            return {
+              lane: (node.className.match(/dtn-lane--(\w+)/) || [])[1] || "",
+              name: nameNode ? nameNode.textContent.trim() : "",
+              count: countNode ? countNode.textContent.trim() : "",
+              cards: node.querySelectorAll(".dtn-card").length,
+            };
           });
-          info.rows = Array.from(document.querySelectorAll(".dtn-row")).map(function (node) {
-            return node.textContent.trim();
+          info.cards = Array.from(document.querySelectorAll(".dtn-card")).map(function (node) {
+            var titleNode = node.querySelector(".dtn-card__title");
+            var timeNode = node.querySelector(".dtn-card__time");
+            var badgeNode = node.querySelector(".dtn-badge");
+            return {
+              title: titleNode ? titleNode.textContent.trim() : "",
+              time: timeNode ? timeNode.textContent.trim() : "",
+              badge: badgeNode ? badgeNode.textContent.trim() : "",
+            };
           });
+          info.chips = Array.from(document.querySelectorAll(".dtn-chip")).map(function (node) {
+            return {
+              lane: node.getAttribute("data-lane"),
+              text: node.textContent.trim(),
+              pressed: node.getAttribute("aria-pressed") === "true",
+            };
+          });
+          var archiveBarNode = document.querySelector(".dtn-archive__bar");
+          var archiveHistNodes = document.querySelectorAll(".dtn-hist");
+          info.archive = archiveBarNode
+            ? {
+                text: archiveBarNode.textContent.trim(),
+                expanded: archiveBarNode.getAttribute("aria-expanded") === "true",
+                items: archiveHistNodes.length,
+              }
+            : null;
           info.openedSessions = openedSessions.slice();
           info.cleanupCount = cleanups.length;
           info.renderedScreenshot = true;
@@ -1012,7 +1174,7 @@
 
         async function waitForRendered(timeoutMs) {
           var expectedTitle = shellLang === "zh" ? "任务面板" : "Tasks";
-          var expectedEmpty = shellLang === "zh" ? "没有未读的已完成任务" : "No unread completed tasks";
+          var expectedEmpty = shellLang === "zh" ? "现在没有任务" : "Nothing here yet";
           var deadline = Date.now() + timeoutMs;
           while (Date.now() < deadline) {
             var main = document.getElementById("main-slot");
@@ -1021,32 +1183,14 @@
               if (stateName === "empty") {
                 if (text.indexOf(expectedEmpty) >= 0) return true;
               } else {
-                var rows = main.querySelectorAll(".dtn-row").length;
-                if (rows > 0) return true;
+                var cards = main.querySelectorAll(".dtn-card").length;
+                if (cards >= 1) return true;
               }
             }
             if (window.__previewLoadError || window.__previewError) return false;
             await sleep(50);
           }
           return false;
-        }
-
-        function selectTab(tab) {
-          var order = { input: 0, unread: 1, running: 2, idle: 3, all: 4 };
-          var buttons = document.querySelectorAll(".dtn-tab");
-          var target = buttons[order[tab]];
-          if (!target) return false;
-          if (target.getAttribute("aria-selected") !== "true" && target.getAttribute("aria-current") !== "page") {
-            target.click();
-          }
-          return true;
-        }
-
-        function focusActiveTab(tab) {
-          var order = { input: 0, unread: 1, running: 2, idle: 3, all: 4 };
-          var buttons = document.querySelectorAll(".dtn-tab");
-          var target = buttons[order[tab]];
-          if (target && typeof target.focus === "function") target.focus();
         }
 
         function collectReport() {
@@ -1056,8 +1200,9 @@
             previewError: window.__previewError || null,
             mainExists: !!main,
             mainText: main ? main.textContent.trim().slice(0, 240) : "",
-            tabs: document.querySelectorAll(".dtn-tab").length,
-            rows: document.querySelectorAll(".dtn-row").length,
+            lanes: document.querySelectorAll(".dtn-lane").length,
+            cards: document.querySelectorAll(".dtn-card").length,
+            chips: document.querySelectorAll(".dtn-chip").length,
             entries: Array.from(entries.keys()),
           };
         }

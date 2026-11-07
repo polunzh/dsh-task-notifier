@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>方向 A · 分组总览 · dsh-task-notifier 设计稿</title>
+    <link rel="stylesheet" href="_tokens.css" />
+    <style>
+      /* ================= 页面骨架 ================= */
+      .page {
+        height: 100%;
+        overflow: auto;
+        background: var(--dsw-alias-bg-base);
+        padding: 44px 40px 56px;
+      }
+      .shell {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+
+      /* ================= 页头 ================= */
+      .head {
+        display: flex;
+        align-items: flex-start;
+        gap: 32px;
+        justify-content: space-between;
+        margin-bottom: 26px;
+      }
+      .eyebrow {
+        font-family: var(--ds-font-family-code);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.18em;
+        color: var(--ink-3);
+        margin-bottom: 10px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 27px;
+        line-height: 34px;
+        font-weight: 620;
+        letter-spacing: -0.022em;
+        color: var(--ink);
+      }
+      .sub {
+        margin: 8px 0 0;
+        max-width: 620px;
+        font-size: 12.5px;
+        line-height: 20px;
+        color: var(--ink-2);
+      }
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: none;
+        padding-top: 6px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--dsw-radius-sm);
+        border: 1px solid var(--hairline);
+        background: var(--dsw-alias-bg-layer-1);
+        color: var(--ink-2);
+        font-size: 12.5px;
+        font-weight: 500;
+        white-space: nowrap;
+        transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+      }
+      .btn .ico { color: var(--ink-3); }
+      .btn:hover {
+        background: var(--dsw-alias-interactive-bg-hover-solid);
+        border-color: var(--dsw-alias-border-l3);
+        color: var(--ink);
+      }
+      .btn:hover .ico { color: var(--ink-2); }
+      .btn--primary {
+        border-color: transparent;
+        background: var(--ink);
+        color: var(--dsw-alias-label-primary-inverted);
+        font-weight: 550;
+        padding: 0 14px;
+        box-shadow: 0 1px 2px #0f11151f, inset 0 0.5px 0 #ffffff24;
+      }
+      .btn--primary .ico { color: currentColor; opacity: 0.9; }
+      .btn--primary:hover {
+        background: color-mix(in srgb, var(--ink) 88%, var(--dsw-alias-bg-base));
+        color: var(--dsw-alias-label-primary-inverted);
+      }
+
+      /* 通知权限：一个"状态"，不是一排同权按钮 */
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        height: 32px;
+        padding: 0 10px 0 9px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        color: var(--ink-2);
+        font-size: 12px;
+        white-space: nowrap;
+        transition: background 140ms ease;
+      }
+      .status-pill:hover { background: var(--dsw-alias-interactive-bg-hover); }
+      .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--dsw-alias-state-success-primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-success-primary) 16%, transparent);
+      }
+
+      /* ================= 状态总览（兼筛选） ================= */
+      .rail {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+      .card {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 15px 16px;
+        text-align: left;
+        border-radius: var(--dsw-radius-md);
+        border: 1px solid var(--hairline);
+        background: var(--dsw-alias-bg-layer-1);
+        box-shadow: var(--dsw-elevation-panel);
+        transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms ease,
+          border-color 160ms ease, background 160ms ease;
+      }
+      .card:hover {
+        transform: translateY(-1px);
+        box-shadow: var(--dsw-elevation-prominent);
+      }
+      .card:active { transform: translateY(0); }
+      .card__icon {
+        display: grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 11px;
+        flex: none;
+      }
+      .card__body { min-width: 0; flex: 1; }
+      .card__value {
+        display: block;
+        font-family: var(--ds-font-family-code);
+        font-variant-numeric: tabular-nums;
+        font-size: 23px;
+        line-height: 26px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        color: var(--ink);
+      }
+      .card__label {
+        display: block;
+        margin-top: 2px;
+        font-size: 12px;
+        line-height: 16px;
+        font-weight: 500;
+        color: var(--ink-2);
+      }
+      .card__hint {
+        display: block;
+        margin-top: 3px;
+        font-size: 10.5px;
+        line-height: 15px;
+        color: var(--ink-3);
+      }
+      .card__go {
+        align-self: flex-start;
+        color: var(--ink-3);
+        opacity: 0;
+        transform: translateX(-2px);
+        transition: opacity 160ms ease, transform 160ms ease;
+      }
+      .card:hover .card__go { opacity: 1; transform: translateX(0); }
+
+      .card--input { border-color: var(--warn-line); background: linear-gradient(180deg, var(--warn-tint), var(--dsw-alias-bg-layer-1) 72%); }
+      .card--input .card__icon { background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 13%, var(--dsw-alias-bg-base)); color: var(--warn-ink); }
+      .card--input .card__value { color: var(--warn-ink); }
+
+      .card--running .card__icon { background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 11%, var(--dsw-alias-bg-base)); color: var(--blue-ink); }
+      .card--unread .card__icon { background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, var(--dsw-alias-bg-base)); color: var(--green-ink); }
+
+      /* 选中态：筛选时把卡片压成"当前视图" */
+      .card[aria-pressed="true"] {
+        border-color: color-mix(in srgb, var(--ink) 22%, transparent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 6%, transparent), var(--dsw-elevation-prominent);
+      }
+      .card[aria-pressed="true"] .card__go { opacity: 0; }
+
+      /* ================= 工具条 ================= */
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .search {
+        position: relative;
+        display: flex;
+        align-items: center;
+        width: 320px;
+        height: 34px;
+        padding: 0 10px;
+        gap: 8px;
+        border-radius: var(--dsw-radius-sm);
+        border: 1px solid var(--dsw-alias-border-l2);
+        background: var(--dsw-specific-input-major);
+        color: var(--ink-3);
+        transition: border-color 140ms ease, box-shadow 140ms ease;
+      }
+      .search:focus-within {
+        border-color: color-mix(in srgb, var(--dsw-focus-ring-color) 58%, transparent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-focus-ring-color) 14%, transparent);
+      }
+      .search input {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        font: inherit;
+        font-size: 12.5px;
+        color: var(--ink);
+      }
+      .search input::placeholder { color: var(--ink-3); }
+      .toolbar__spacer { flex: 1; }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid var(--hairline);
+        color: var(--ink-2);
+        font-size: 11.5px;
+        font-weight: 500;
+        transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+      }
+      .chip:hover { background: var(--dsw-alias-interactive-bg-hover-solid); color: var(--ink); }
+      .chip[aria-pressed="true"] {
+        background: var(--ink);
+        border-color: transparent;
+        color: var(--dsw-alias-label-primary-inverted);
+      }
+      .chip__n {
+        font-family: var(--ds-font-family-code);
+        font-variant-numeric: tabular-nums;
+        font-size: 10.5px;
+        opacity: 0.7;
+      }
+
+      /* ================= 分组 ================= */
+      .groups {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
+        gap: 14px;
+      }
+      .group {
+        border-radius: var(--dsw-radius-md);
+        border: 1px solid var(--hairline);
+        background: var(--dsw-alias-bg-layer-1);
+        box-shadow: 0 1px 2px #0f111508;
+        overflow: hidden;
+      }
+      .group--input {
+        border-color: var(--warn-line);
+        background: linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-state-warn-primary) 6%, var(--dsw-alias-bg-base)), var(--dsw-alias-bg-layer-1) 54%);
+      }
+      .group__head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 14px 10px;
+      }
+      .group__dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+      .group__title {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        color: var(--ink);
+      }
+      .group__count {
+        font-family: var(--ds-font-family-code);
+        font-variant-numeric: tabular-nums;
+        font-size: 10.5px;
+        font-weight: 600;
+        color: var(--ink-2);
+        background: var(--dsw-alias-interactive-bg-hover);
+        border-radius: 999px;
+        padding: 1px 6px;
+      }
+      .group__note {
+        font-size: 11px;
+        color: var(--ink-3);
+        margin-left: 2px;
+      }
+      .group__action {
+        margin-left: auto;
+        font-size: 11.5px;
+        font-weight: 500;
+        color: var(--ink-3);
+        padding: 2px 6px;
+        border-radius: 6px;
+        transition: background 140ms ease, color 140ms ease;
+      }
+      .group__action:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--ink); }
+
+      .rows { display: flex; flex-direction: column; padding: 0 6px 6px; }
+      .row {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        min-height: 46px;
+        padding: 6px 8px;
+        border-radius: var(--dsw-radius-sm);
+        text-align: left;
+        transition: background 130ms ease;
+      }
+      .row + .row::before {
+        content: "";
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        top: -1px;
+        height: 1px;
+        background: var(--dsw-alias-border-l1);
+      }
+      .row:hover { background: var(--dsw-alias-interactive-bg-hover-solid); }
+      .row:hover::before,
+      .row:hover + .row::before { opacity: 0; }
+      .row--input {
+        background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 7%, transparent);
+      }
+      .row--input::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 7px;
+        bottom: 7px;
+        width: 2.5px;
+        border-radius: 2px;
+        background: var(--dsw-alias-state-warn-primary);
+      }
+      .row--input:hover { background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 12%, transparent); }
+
+      .glyph {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 18px;
+        height: 18px;
+        flex: none;
+      }
+      .glyph--input::before {
+        content: "";
+        position: absolute;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 1.5px solid color-mix(in srgb, var(--dsw-alias-state-warn-primary) 55%, transparent);
+        animation: pulse 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+      }
+      .glyph--input::after {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--dsw-alias-state-warn-primary);
+      }
+      .glyph--running::before {
+        content: "";
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        border: 1.8px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 26%, transparent);
+        border-top-color: var(--dsw-alias-state-business-primary);
+        animation: spin 0.9s linear infinite;
+      }
+      .glyph--unread::before {
+        content: "";
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--dsw-alias-state-success-primary);
+        box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--dsw-alias-state-success-primary) 13%, transparent);
+      }
+      .glyph--done::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--dsw-alias-label-caption);
+      }
+
+      .row__title {
+        flex: 1;
+        min-width: 0;
+        font-size: 12.5px;
+        line-height: 18px;
+        color: var(--ink);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .row--unread .row__title,
+      .row--input .row__title { font-weight: 580; }
+
+      .row__live {
+        width: 34px;
+        height: 3px;
+        border-radius: 2px;
+        flex: none;
+        background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 16%, transparent);
+        overflow: hidden;
+        position: relative;
+      }
+      .row__live::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        width: 40%;
+        border-radius: 2px;
+        background: var(--dsw-alias-state-business-primary);
+        animation: slide 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      }
+
+      .row__meta {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        flex: none;
+        font-size: 11px;
+        line-height: 16px;
+        color: var(--ink-3);
+        font-family: var(--ds-font-family-code);
+        font-variant-numeric: tabular-nums;
+      }
+      .row__state { font-family: var(--dsw-font-family); font-weight: 500; }
+      .row--input .row__state { color: var(--warn-ink); font-weight: 600; }
+      .row--unread .row__state { color: var(--green-ink); }
+      .row__sep { color: var(--dsw-alias-label-caption); }
+
+      .row__go {
+        flex: none;
+        display: grid;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        color: var(--ink-3);
+        opacity: 0;
+        transform: translateX(-3px);
+        transition: opacity 140ms ease, transform 140ms ease, background 140ms ease;
+      }
+      .row:hover .row__go { opacity: 1; transform: translateX(0); }
+      .row__go:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--ink); }
+
+      .blank {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 14px 16px;
+        color: var(--ink-3);
+        font-size: 11.5px;
+      }
+      .blank .ico { color: var(--dsw-alias-label-caption); }
+
+      @keyframes pulse {
+        0% { opacity: 0.55; transform: scale(0.75); }
+        70%, 100% { opacity: 0; transform: scale(1.75); }
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @keyframes slide {
+        0% { transform: translateX(-110%); }
+        60%, 100% { transform: translateX(260%); }
+      }
+
+      /* 窄屏：状态卡改两列，分组改单列。 */
+      @media (max-width: 1080px) {
+        .page { padding: 28px 24px 40px; }
+        .head { flex-direction: column; gap: 16px; }
+        .actions { padding-top: 0; flex-wrap: wrap; }
+        .rail { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .card { padding: 12px; gap: 10px; }
+        .card__value { font-size: 20px; }
+        .groups { grid-template-columns: minmax(0, 1fr); }
+      }
+      @media (max-width: 720px) {
+        .rail { grid-template-columns: minmax(0, 1fr); }
+        .card__hint { display: none; }
+        .search { width: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="shell">
+        <!-- ============================ 页头 ============================ -->
+        <header class="head">
+          <div>
+            <div class="eyebrow">TASK NOTIFIER</div>
+            <h1>任务面板</h1>
+            <p class="sub">
+              待回复、进行中与已完成未读的任务都在这一页；任务完成时会响一声并弹出通知。
+            </p>
+          </div>
+          <div class="actions">
+            <button class="status-pill" type="button" title="点击授权浏览器通知">
+              <span class="status-dot"></span>
+              浏览器通知已开启
+            </button>
+            <button class="btn" type="button">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 10v4h3l4 3V7L7 10H4Z" />
+                <path d="M15.5 9.2a4 4 0 0 1 0 5.6" />
+              </svg>
+              试听提示音
+            </button>
+            <button class="btn" type="button">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4a5 5 0 0 0-5 5v3.4L5.4 15h13.2L17 12.4V9a5 5 0 0 0-5-5Z" />
+                <path d="M10 18a2 2 0 0 0 4 0" />
+              </svg>
+              试发通知
+            </button>
+            <button class="btn btn--primary" type="button">
+              <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 12.5l4 4L20 6" />
+              </svg>
+              全部标为已读（3）
+            </button>
+          </div>
+        </header>
+
+        <!-- ======================== 状态总览（筛选） ======================== -->
+        <section class="rail" aria-label="状态总览">
+          <button class="card card--input" type="button" aria-pressed="false">
+            <span class="card__icon">
+              <svg class="ico ico--18" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3.5 21 20H3L12 3.5Z" />
+                <path d="M12 9.5v4" />
+                <path d="M12 16.6h.01" />
+              </svg>
+            </span>
+            <span class="card__body">
+              <span class="card__value">1</span>
+              <span class="card__label">待回复</span>
+              <span class="card__hint">有会话卡在等你决定</span>
+            </span>
+            <svg class="ico ico--18 card__go" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
+
+          <button class="card card--running" type="button" aria-pressed="false">
+            <span class="card__icon">
+              <svg class="ico ico--18" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8.2" opacity="0.35" />
+                <path d="M12 3.8a8.2 8.2 0 0 1 8.2 8.2" />
+              </svg>
+            </span>
+            <span class="card__body">
+              <span class="card__value">2</span>
+              <span class="card__label">运行中</span>
+              <span class="card__hint">Agent 正在执行</span>
+            </span>
+            <svg class="ico ico--18 card__go" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
+
+          <button class="card card--unread" type="button" aria-pressed="false">
+            <span class="card__icon">
+              <svg class="ico ico--18" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4.5 7.5 12 13l7.5-5.5" />
+                <rect x="3.5" y="5.5" width="17" height="13" rx="2.4" />
+              </svg>
+            </span>
+            <span class="card__body">
+              <span class="card__value">3</span>
+              <span class="card__label">已完成未读</span>
+              <span class="card__hint">结果还没看过</span>
+            </span>
+            <svg class="ico ico--18 card__go" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
+        </section>
+
+        <!-- ============================ 工具条 ============================ -->
+        <div class="toolbar">
+          <label class="search">
+            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.2" />
+              <path d="M15.6 15.6 20 20" />
+            </svg>
+            <input type="text" placeholder="按标题搜索…" aria-label="搜索任务" />
+          </label>
+          <span class="toolbar__spacer"></span>
+          <button class="chip" type="button" aria-pressed="true">
+            全部任务 <span class="chip__n">8</span>
+          </button>
+        </div>
+
+        <!-- ============================ 分组 ============================ -->
+        <div class="groups">
+          <!-- 待回复 -->
+          <section class="group group--input">
+            <header class="group__head">
+              <span class="group__dot" style="background: var(--dsw-alias-state-warn-primary)"></span>
+              <span class="group__title">等你回复</span>
+              <span class="group__count">1</span>
+              <span class="group__note">打开会话即可继续</span>
+            </header>
+            <div class="rows">
+              <button class="row row--input" type="button">
+                <span class="glyph glyph--input" aria-hidden="true"></span>
+                <span class="row__title">确认是否覆盖线上数据</span>
+                <span class="row__meta">
+                  <span class="row__state">等待审批</span>
+                  <span class="row__sep">·</span>
+                  <span>刚刚</span>
+                </span>
+                <span class="row__go" aria-hidden="true">
+                  <svg class="ico" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+                </span>
+              </button>
+            </div>
+          </section>
+
+          <!-- 运行中 -->
+          <section class="group">
+            <header class="group__head">
+              <span class="group__dot" style="background: var(--dsw-alias-state-business-primary)"></span>
+              <span class="group__title">进行中</span>
+              <span class="group__count">2</span>
+            </header>
+            <div class="rows">
+              <button class="row" type="button">
+                <span class="glyph glyph--running" aria-hidden="true"></span>
+                <span class="row__title">重构通知去重逻辑</span>
+                <span class="row__live" aria-hidden="true"></span>
+                <span class="row__meta"><span>42 秒前</span></span>
+                <span class="row__go" aria-hidden="true">
+                  <svg class="ico" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+                </span>
+              </button>
+              <button class="row" type="button">
+                <span class="glyph glyph--running" aria-hidden="true"></span>
+                <span class="row__title">抓取竞品价格快照</span>
+                <span class="row__live" aria-hidden="true"></span>
+                <span class="row__meta"><span>3 分钟前</span></span>
+                <span class="row__go" aria-hidden="true">
+                  <svg class="ico" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+                </span>
+              </button>
+            </div>
+          </section>
+
+          <!-- 已完成未读 -->
+          <section class="group">
+            <header class="group__head">
+              <span class="group__dot" style="background: var(--dsw-alias-state-success-primary)"></span>
+              <span class="group__title">已完成未读</span>
+              <span class="group__count">3</span>
+              <button class="group__action" type="button">全部标为已读</button>
+            </header>
+            <div class="rows">
+              <button class="row row--unread" type="button">
+                <span class="glyph glyph--unread" aria-hidden="true"></span>
+                <span class="row__title">整理会议纪要</span>
+                <span class="row__meta">
+                  <span class="row__state">完成</span>
+                  <span class="row__sep">·</span>
+                  <span>2 分钟前</span>
+                </span>
+                <span class="row__go" aria-hidden="true">
+                  <svg class="ico" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+                </span>
+              </button>
+              <button class="row row--unread" type="button">
+                <span class="glyph glyph--unread" aria-hidden="true"></span>
+                <span class="row__title">修复移动端侧栏折叠</span>
+                <span class="row__meta">
+                  <span class="row__state">完成</span>
+                  <span class="row__sep">·</span>
+                  <span>12 分钟前</span>
+                </span>
+                <span class="row__go" aria-hidden="true">
+                  <svg class="ico" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+                </span>
+              </button>
+              <button class="row row--unread" type="button">
+                <span class="glyph glyph--unread" aria-hidden="true"></span>
+                <span class="row__title">补齐插件市场截图</span>
+                <span class="row__meta">
+                  <span class="row__state">完成</span>
+                  <span class="row__sep">·</span>
+                  <span>58 分钟前</span>
+                </span>
+                <span class="row__go" aria-hidden="true">
+                  <svg class="ico" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+                </span>
+              </button>
+            </div>
+          </section>
+
+          <!-- 更早完成 -->
+          <section class="group">
+            <header class="group__head">
+              <span class="group__dot" style="background: var(--dsw-alias-label-caption)"></span>
+              <span class="group__title">更早完成</span>
+              <span class="group__count">2</span>
+              <button class="group__action" type="button">按时间排序</button>
+            </header>
+            <div class="rows">
+              <button class="row" type="button">
+                <span class="glyph glyph--done" aria-hidden="true"></span>
+                <span class="row__title" style="color: var(--ink-2)">写好 README 安装说明</span>
+                <span class="row__meta"><span>3 小时前</span></span>
+                <span class="row__go" aria-hidden="true">
+                  <svg class="ico" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+                </span>
+              </button>
+              <button class="row" type="button">
+                <span class="glyph glyph--done" aria-hidden="true"></span>
+                <span class="row__title" style="color: var(--ink-2)">整理发布检查清单</span>
+                <span class="row__meta"><span>昨天</span></span>
+                <span class="row__go" aria-hidden="true">
+                  <svg class="ico" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+                </span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -49,7 +49,7 @@ const shots = [
     theme: "light",
     kind: "filled",
     url: "?state=filled&theme=light",
-    narrative: "浅色 · 已完成未读（默认 Tab）",
+    narrative: "浅色 · 三列看板（待回复 / 运行中 / 已完成未读）",
   },
   {
     name: "panel-dark",
@@ -58,7 +58,7 @@ const shots = [
     theme: "dark",
     kind: "filled",
     url: "?state=filled&theme=dark",
-    narrative: "深色 · 已完成未读（默认 Tab）",
+    narrative: "深色 · 三列看板（待回复 / 运行中 / 已完成未读）",
   },
   {
     name: "panel-light-en",
@@ -76,8 +76,10 @@ const shots = [
     height: 900,
     theme: "light",
     kind: "filled",
-    url: "?state=filled&theme=light&tab=unread&focus=tab",
-    narrative: "浅色 · 已完成未读 Tab 聚焦",
+    filter: "unread",
+    focus: "tab",
+    url: "?state=filled&theme=light&filter=unread&focus=tab",
+    narrative: "浅色 · 已完成未读单列筛选聚焦",
   },
   {
     name: "needs-input",
@@ -85,9 +87,10 @@ const shots = [
     height: 900,
     theme: "light",
     kind: "filled",
-    url: "?state=filled&theme=light&tab=input",
-    narrative: "浅色 · 待回复 Tab（有人在等你回答）",
-    rowText: "确认是否覆盖线上数据",
+    filter: "input",
+    url: "?state=filled&theme=light&filter=input",
+    narrative: "浅色 · 待回复单列筛选（等待用户审批/输入）",
+    cardText: "确认是否覆盖线上数据",
   },
   {
     name: "empty",
@@ -106,7 +109,26 @@ const shots = [
     kind: "filled",
     mobile: true,
     url: "?state=filled&theme=light",
-    narrative: "窄屏 390×844 · 侧栏收成图标轨",
+    narrative: "窄屏 390×844 · 侧栏收成图标轨，三列响应式排列",
+  },
+  {
+    name: "wide",
+    width: 1920,
+    height: 1080,
+    theme: "light",
+    kind: "filled",
+    wide: true,
+    url: "?state=filled&theme=light",
+    narrative: "超宽屏 1920×1080 · 验证 max-width 1240 收敛",
+  },
+  {
+    name: "busy",
+    width: 1440,
+    height: 900,
+    theme: "light",
+    kind: "busy",
+    url: "?state=busy&theme=light",
+    narrative: "压测 12 条任务 · 验证长标题截断与多卡片排布",
   },
 ];
 
@@ -361,20 +383,31 @@ async function inspectPage(cdp, sessionId) {
     `(() => {
       const main = document.getElementById('main-slot');
       const root = main ? main.querySelector('.dtn-root') : null;
+      const page = main ? main.querySelector('.dtn-page') : null;
       const text = main ? (main.innerText || '').trim() : '';
-      const rect = root ? root.getBoundingClientRect() : null;
-      const tabs = Array.from(document.querySelectorAll('.dtn-tab')).map((node) => ({
+      const rootRect = root ? root.getBoundingClientRect() : null;
+      const pageRect = page ? page.getBoundingClientRect() : null;
+      const lanes = Array.from(document.querySelectorAll('.dtn-lane')).map((node) => ({
+        className: node.className,
+        name: (node.querySelector('.dtn-lane__name')?.textContent || '').trim(),
+        count: (node.querySelector('.dtn-lane__count')?.textContent || '').trim(),
+        cards: node.querySelectorAll('.dtn-card').length,
+      }));
+      const chips = Array.from(document.querySelectorAll('.dtn-chip')).map((node) => ({
+        lane: node.getAttribute('data-lane'),
         text: (node.textContent || '').trim(),
-        active:
-          node.getAttribute('aria-selected') === 'true' ||
-          node.getAttribute('aria-current') === 'page',
+        pressed: node.getAttribute('aria-pressed') === 'true',
         focused: document.activeElement === node,
       }));
-      const rows = Array.from(document.querySelectorAll('.dtn-row')).map((node) => ({
-        text: (node.innerText || '').trim().replace(/\\s+/g, ' '),
+      const cards = Array.from(document.querySelectorAll('.dtn-card')).map((node) => ({
+        title: (node.querySelector('.dtn-card__title')?.innerText || '').trim().replace(/\\s+/g, ' '),
+        time: (node.querySelector('.dtn-card__time')?.textContent || '').trim(),
+        badge: (node.querySelector('.dtn-badge')?.textContent || '').trim(),
       }));
+      const blank = document.querySelector('.dtn-blank');
+      const archiveBar = document.querySelector('.dtn-archive__bar');
+      const search = document.querySelector('.dtn-search__input');
       const head = document.querySelector('.dtn-head');
-      const search = document.querySelector('.dtn-root input');
       const active = document.activeElement;
       const visible = (selector) => {
         const node = document.querySelector(selector);
@@ -392,19 +425,26 @@ async function inspectPage(cdp, sessionId) {
         stateLabel: (document.getElementById('preview-state') || {}).textContent || '',
         textLength: text.length,
         textSample: text.slice(0, 420),
-        tabs,
-        rows,
+        lanes,
+        chips,
+        cards,
+        blankVisible: visible('.dtn-blank'),
+        blankText: blank ? (blank.innerText || '').trim() : '',
+        archiveVisible: visible('.dtn-archive__bar'),
+        archiveText: archiveBar ? (archiveBar.innerText || '').trim() : '',
         sidebarIcon: !!document.querySelector('#sidebar-slot svg'),
         sidebarBadge: !!document.querySelector('#sidebar-slot svg text'),
-        panelHeight: rect ? Math.round(rect.height) : 0,
-        panelWidth: rect ? Math.round(rect.width) : 0,
+        panelHeight: rootRect ? Math.round(rootRect.height) : 0,
+        panelWidth: rootRect ? Math.round(rootRect.width) : 0,
+        pageWidth: pageRect ? Math.round(pageRect.width) : 0,
         scrollWidth: document.documentElement.scrollWidth,
         clientWidth: document.documentElement.clientWidth,
         searchPlaceholder: search ? search.getAttribute('placeholder') : null,
         headText: head ? (head.innerText || '').trim().replace(/\\s+/g, ' ').slice(0, 500) : '',
         activeElement: active ? (active.tagName + '.' + String(active.className || '')).slice(0, 120) : null,
+        focusedChip: chips.find((c) => c.focused)?.lane || null,
         focusVisible: active ? active.matches(':focus-visible') : false,
-        bodyText: (document.body.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 1200),
+        bodyText: (document.body.innerText || '').trim().replace(/\\s+/g, ' ').slice(0, 1200),
         navLabel: (document.getElementById('nav-label') || {}).textContent || '',
         mainTitle: (document.getElementById('main-title') || {}).textContent || '',
         debugChipVisible: visible('.main-hint'),
@@ -434,53 +474,119 @@ function validateShot(shot, info) {
     problems.push(`界面语言不符：期望 ${expectedLocale}，实际 ${info.previewInfo?.locale}`);
   }
 
-  // 标题 / Tab / 按钮 / 搜索框：按语言断言，防止中英文串台。
+  // 标题 / 按钮 / 搜索框：按语言断言，防止中英文串台。
   const title = isEnglish ? "Tasks" : "任务面板";
   if (!info.textSample.includes(title)) {
     problems.push(`主区域没有出现标题「${title}」（locale=${info.previewInfo?.locale ?? "?"}）`);
   }
-  const expectedTabs = isEnglish
-    ? ["Needs input", "Unread", "Running", "Completed", "All"]
-    : ["待回复", "已完成未读", "运行中", "已完成", "全部"];
-  if (info.tabs.length !== 5) {
-    problems.push(`Tab 数量异常：期望 5，实际 ${info.tabs.length}（${info.tabs.map((t) => t.text).join(" / ")}）`);
-  } else {
-    for (const label of expectedTabs) {
-      if (!info.tabs.some((tab) => tab.text.startsWith(label))) {
-        problems.push(`缺少 Tab「${label}」（实际：${info.tabs.map((t) => t.text).join(" / ")}）`);
-      }
-    }
-    if (!info.tabs.some((tab) => tab.active)) problems.push("没有选中的 Tab（aria-selected=true）");
-  }
+
   const expectedButtons = isEnglish
     ? ["Browser notifications", "Preview chime", "Send test notification"]
     : ["浏览器通知", "试听提示音", "试发系统通知"];
-  if (shot.kind === "filled") {
-    expectedButtons.push(isEnglish ? "Mark all read (3)" : "全部标为已读");
+  if (shot.kind !== "empty") {
+    expectedButtons.push(isEnglish ? "Mark all read" : "全部标为已读");
   }
   for (const label of expectedButtons) {
     if (!info.headText.includes(label)) {
       problems.push(`顶部按钮缺少「${label}」（实际：${info.headText.slice(0, 240)}）`);
     }
   }
+
   const searchPlaceholder = isEnglish ? "Search by title" : "按标题搜索";
-  if (!info.searchPlaceholder || !info.searchPlaceholder.includes(searchPlaceholder)) {
-    problems.push(`搜索框占位符异常：${JSON.stringify(info.searchPlaceholder)}`);
+  if (shot.kind !== "empty") {
+    if (!info.searchPlaceholder || !info.searchPlaceholder.includes(searchPlaceholder)) {
+      problems.push(`搜索框占位符异常：${JSON.stringify(info.searchPlaceholder)}`);
+    }
   }
+
   if (!info.sidebarIcon) problems.push("侧栏 sidebar.panellist 图标没有渲染");
-  if (shot.kind === "filled" && info.rows.length < 1) {
-    problems.push(`任务列表为空（期望至少 1 行）：${JSON.stringify(info.textSample.slice(0, 160))}`);
+
+  // Chips 校验
+  if (shot.kind !== "empty") {
+    if (info.chips.length !== 3) {
+      problems.push(`Chip 数量异常：期望 3，实际 ${info.chips.length}`);
+    } else {
+      const expectedChips = isEnglish
+        ? [
+            { lane: "input", label: "Needs input" },
+            { lane: "running", label: "Running" },
+            { lane: "unread", label: "Unread" },
+          ]
+        : [
+            { lane: "input", label: "待回复" },
+            { lane: "running", label: "运行中" },
+            { lane: "unread", label: "已完成未读" },
+          ];
+      for (const item of expectedChips) {
+        const c = info.chips.find((chip) => chip.lane === item.lane);
+        if (!c || !c.text.includes(item.label)) {
+          problems.push(`缺少 chip「${item.label}」`);
+        }
+      }
+      if (shot.filter) {
+        const activeChip = info.chips.find((chip) => chip.lane === shot.filter);
+        if (!activeChip?.pressed) {
+          problems.push(`筛选 chip[data-lane="${shot.filter}"] 未被选中（aria-pressed=false）`);
+        }
+      } else {
+        if (info.chips.some((chip) => chip.pressed)) {
+          problems.push("未指定筛选但有 chip 处于 pressed 状态");
+        }
+      }
+    }
   }
-  if (shot.rowText && !info.rows.some((row) => row.text.includes(shot.rowText))) {
-    problems.push(`任务行缺少「${shot.rowText}」：${JSON.stringify(info.rows.map((row) => row.text).slice(0, 4))}`);
+
+  // 焦点校验
+  if (shot.focus === "tab") {
+    if (shot.filter && info.focusedChip !== shot.filter) {
+      problems.push(`焦点未在筛选 chip 上：期望 ${shot.filter}，实际 ${info.focusedChip || info.activeElement}`);
+    }
   }
-  if (shot.kind === "filled" && isEnglish && !info.rows.some((row) => row.text.includes("Done ·"))) {
-    problems.push(`英文任务行没有出现「Done ·」：${JSON.stringify(info.rows.map((r) => r.text).slice(0, 3))}`);
+
+  // 看板列与卡片断言
+  if (shot.filter) {
+    if (info.lanes.length !== 1) {
+      problems.push(`单列筛选下列数异常：期望 1，实际 ${info.lanes.length}`);
+    } else if (!info.lanes[0].className.includes(`dtn-lane--${shot.filter}`)) {
+      problems.push(`单列类名不匹配：期望包含 dtn-lane--${shot.filter}，实际 ${info.lanes[0].className}`);
+    }
+    if (info.cards.length < 1) {
+      problems.push(`单列任务卡片为空（期望至少 1 个）`);
+    }
+  } else if (shot.kind === "filled") {
+    if (info.lanes.length !== 3) {
+      problems.push(`看板列数异常：期望 3，实际 ${info.lanes.length}`);
+    }
+    if (info.cards.length < 6) {
+      problems.push(`卡片数量不足：期望至少 6 张，实际 ${info.cards.length}`);
+    }
+  } else if (shot.kind === "busy") {
+    if (info.lanes.length !== 3) {
+      problems.push(`看板列数异常：期望 3，实际 ${info.lanes.length}`);
+    }
+    if (info.cards.length < 10) {
+      problems.push(`压测卡片数量不足：期望至少 10 张，实际 ${info.cards.length}`);
+    }
+  } else if (shot.kind === "empty") {
+    if (!info.blankVisible) problems.push("空状态 .dtn-blank 未可见");
+    if (info.lanes.length !== 0) problems.push(`空状态却渲染了 ${info.lanes.length} 列`);
+    if (info.cards.length !== 0) problems.push(`空状态却渲染了 ${info.cards.length} 张卡片`);
+    const emptyTitle = isEnglish ? "Nothing here yet" : "现在没有任务";
+    if (!info.blankText.includes(emptyTitle)) problems.push(`空状态文案没有出现「${emptyTitle}」`);
   }
-  if (shot.kind === "empty") {
-    if (info.rows.length !== 0) problems.push(`空状态却渲染了 ${info.rows.length} 行任务`);
-    if (!info.textSample.includes("没有未读的已完成任务")) problems.push("空状态文案没有出现");
+
+  // 指定卡片文本检查
+  if (shot.cardText && !info.cards.some((c) => c.title.includes(shot.cardText))) {
+    problems.push(`任务卡片缺少「${shot.cardText}」：${JSON.stringify(info.cards.map((c) => c.title).slice(0, 4))}`);
   }
+
+  // 宽屏收敛
+  if (shot.wide) {
+    if (info.pageWidth > 1240) {
+      problems.push(`宽屏 .dtn-page 宽度超标：${info.pageWidth}px > 1240px`);
+    }
+  }
+
   if (info.panelHeight < 300) problems.push(`面板高度异常（${info.panelHeight}px），可能没有渲染`);
   if (info.scrollWidth > info.clientWidth + 2) {
     problems.push(`检测到横向溢出：scrollWidth=${info.scrollWidth} > clientWidth=${info.clientWidth}`);
@@ -566,17 +672,18 @@ async function captureShot(cdp, shot, baseUrl, pageErrors) {
       height: dimensions.height,
       ready: info.reason ?? readyInfo.reason,
       theme: info.theme,
-      tabs: info.tabs.length,
-      rows: info.rows.length,
+      lanes: info.lanes.length,
+      cards: info.cards.length,
+      chips: info.chips.length,
       textLength: info.textLength,
       notificationPermission: info.previewInfo?.notificationPermission ?? null,
-      focusedTab: info.tabs.find((tab) => tab.focused)?.text ?? null,
+      focusedChip: info.focusedChip,
       state: info.stateLabel,
       consoleErrors: errors.length,
     };
     log(
       `✓ ${shot.name}.png（${Math.round(result.bytes / 1024)} kB，${result.width}×${result.height}，` +
-        `tabs=${result.tabs}，rows=${result.rows}，text=${result.textLength}，theme=${result.theme}）`,
+        `lanes=${result.lanes}，cards=${result.cards}，chips=${result.chips}，text=${result.textLength}，theme=${result.theme}）`,
     );
     return result;
   } finally {
@@ -635,7 +742,7 @@ async function main() {
     for (const result of results) {
       log(
         `  ${result.file}  ${Math.round(result.bytes / 1024)} kB  ${result.width}×${result.height}  ` +
-          `theme=${result.theme} tabs=${result.tabs} rows=${result.rows}`,
+          `theme=${result.theme} lanes=${result.lanes} cards=${result.cards} chips=${result.chips}`,
       );
     }
     if (pageErrors.length > 0) {

@@ -1,0 +1,1289 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>任务看板 · dsh-task-notifier 设计方向 C（Lanes）</title>
+    <link rel="stylesheet" href="_tokens.css" />
+    <style>
+      /* =====================================================================
+         设计方向 C：三列看板 (Lanes)
+         待回复 | 运行中 | 已完成未读 三列并排同屏呈现
+         ===================================================================== */
+
+      :root {
+        --board-bg: #f8fafc;
+        --card-bg: #ffffff;
+        --card-hover-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+      }
+
+      body {
+        background-color: var(--board-bg);
+        color: var(--ink);
+        overflow-y: auto;
+        min-height: 100vh;
+      }
+
+      /* 限制最大宽度，居中，防止在 3254px 宽屏上过度拉伸 */
+      .app-shell {
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 24px 32px 32px;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        box-sizing: border-box;
+      }
+
+      /* 顶部头部区 */
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 18px;
+        gap: 20px;
+      }
+
+      .header-info {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin-bottom: 4px;
+      }
+
+      .eyebrow-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background-color: var(--dsw-alias-state-business-primary);
+      }
+
+      .title-row {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+      }
+
+      .page-title {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 700;
+        line-height: 1.25;
+        color: var(--ink);
+        letter-spacing: -0.01em;
+      }
+
+      .title-en {
+        margin-left: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        color: var(--ink-3);
+      }
+
+      .title-total-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--ink-2);
+        background: #ffffff;
+        padding: 2px 8px;
+        border-radius: 12px;
+        border: 1px solid var(--hairline);
+      }
+
+      .page-desc {
+        margin: 6px 0 0 0;
+        font-size: 13px;
+        color: var(--ink-2);
+        line-height: 1.5;
+      }
+
+      /* 顶部操作工具组 */
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+      }
+
+      /* 通知状态指示牌（非普通按钮，明确的状态标签） */
+      .status-indicator-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        height: 26px;
+        padding: 0 11px;
+        background: var(--dsw-alias-state-success-tertiary);
+        border: 1px solid color-mix(in srgb, var(--dsw-alias-state-success-primary) 20%, transparent);
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--green-ink);
+        user-select: none;
+        white-space: nowrap;
+      }
+
+      .status-indicator-badge .status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--dsw-alias-state-success-primary);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-success-primary) 30%, transparent);
+      }
+
+      /* 次要按钮 */
+      .btn-secondary {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 12px;
+        background: #ffffff;
+        border: 1px solid var(--hairline);
+        border-radius: var(--dsw-radius-sm);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--ink-2);
+        transition: all 0.15s ease;
+      }
+
+      .btn-secondary:hover {
+        background: var(--dsw-alias-interactive-bg-hover-solid);
+        color: var(--ink);
+        border-color: var(--dsw-alias-border-l3);
+      }
+
+      /* 主操作按钮：全部标为已读（3）—— 用中性墨色，避免和三条状态色抢语义 */
+      .btn-primary {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 14px;
+        background: var(--dsw-alias-label-primary);
+        color: #ffffff;
+        border: 1px solid var(--dsw-alias-label-primary);
+        border-radius: var(--dsw-radius-sm);
+        font-size: 12px;
+        font-weight: 600;
+        box-shadow: 0 1px 2px rgba(15, 17, 21, 0.18), 0 2px 6px rgba(15, 17, 21, 0.12);
+        transition: all 0.15s ease;
+      }
+
+      .btn-primary:hover {
+        background: color-mix(in srgb, var(--dsw-alias-label-primary) 86%, #ffffff);
+        border-color: color-mix(in srgb, var(--dsw-alias-label-primary) 86%, #ffffff);
+        box-shadow: 0 2px 4px rgba(15, 17, 21, 0.2), 0 4px 12px rgba(15, 17, 21, 0.18);
+        transform: translateY(-0.5px);
+      }
+
+      .btn-primary .badge-count {
+        background: rgba(255, 255, 255, 0.18);
+        padding: 1px 6px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      /* 搜索与快捷过滤条 */
+      .filter-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+
+      .search-box {
+        position: relative;
+        flex: 1;
+        max-width: 420px;
+      }
+
+      .search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--ink-3);
+        pointer-events: none;
+      }
+
+      .search-input {
+        width: 100%;
+        height: 34px;
+        padding: 0 32px 0 32px;
+        background: #ffffff;
+        border: 1px solid var(--hairline);
+        border-radius: var(--dsw-radius-sm);
+        font-family: inherit;
+        font-size: 13px;
+        color: var(--ink);
+        outline: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      .search-input:focus {
+        border-color: var(--dsw-focus-ring-color);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-focus-ring-color) 15%, transparent);
+      }
+
+      .search-shortcut {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 11px;
+        color: var(--ink-3);
+        background: var(--dsw-alias-interactive-bg-hover-solid);
+        padding: 1px 5px;
+        border-radius: 4px;
+        border: 1px solid var(--hairline);
+        pointer-events: none;
+      }
+
+      /* 右侧工具组：排序 / 视图，弱于搜索框 */
+      .filter-status-summary {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .btn-util {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 30px;
+        padding: 0 10px;
+        border-radius: var(--dsw-radius-xs);
+        font-size: 12px;
+        color: var(--ink-2);
+        transition: background 0.15s ease, color 0.15s ease;
+      }
+
+      .btn-util:hover {
+        background: var(--dsw-alias-interactive-bg-hover);
+        color: var(--ink);
+      }
+
+      .btn-util-sep {
+        width: 1px;
+        height: 14px;
+        background: var(--hairline);
+      }
+
+      /* =====================================================================
+         三列看板主体 (Kanban Board)
+         ===================================================================== */
+      .board-lanes {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        flex: 1;
+        align-items: stretch;
+      }
+
+      /* 单列容器 */
+      .lane {
+        background: #ffffff;
+        border: 1px solid var(--hairline);
+        border-radius: var(--dsw-radius-md);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        position: relative;
+      }
+
+      /* 列顶 2.5px 状态色条 */
+      .lane::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        z-index: 2;
+      }
+
+      .lane--warn::before { background: var(--dsw-alias-state-warn-primary); }
+      .lane--blue::before { background: var(--dsw-alias-state-business-primary); }
+      .lane--green::before { background: var(--dsw-alias-state-success-primary); }
+
+      /* 列头部 */
+      .lane-header {
+        padding: 14px 14px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--hairline);
+        position: relative;
+      }
+
+      .lane--warn .lane-header { background: #ffffff; }
+      .lane--blue .lane-header { background: #ffffff; }
+      .lane--green .lane-header { background: #ffffff; }
+
+      .lane-title-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .lane-icon-wrap {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .lane--warn .lane-icon-wrap {
+        background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 18%, #ffffff);
+        color: var(--warn-ink);
+      }
+      .lane--blue .lane-icon-wrap {
+        background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 16%, #ffffff);
+        color: var(--blue-ink);
+      }
+      .lane--green .lane-icon-wrap {
+        background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 16%, #ffffff);
+        color: var(--green-ink);
+      }
+
+      .lane-title {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .lane--warn .lane-title { color: var(--warn-ink); }
+      .lane--blue .lane-title { color: var(--blue-ink); }
+      .lane--green .lane-title { color: var(--green-ink); }
+
+      .lane-count-badge {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 10px;
+        line-height: 14px;
+      }
+
+      .lane--warn .lane-count-badge {
+        background: var(--dsw-alias-state-warn-primary);
+        color: #ffffff;
+      }
+      .lane--blue .lane-count-badge {
+        background: var(--dsw-alias-state-business-primary);
+        color: #ffffff;
+      }
+      .lane--green .lane-count-badge {
+        background: var(--dsw-alias-state-success-primary);
+        color: #ffffff;
+      }
+
+      .lane-meta-hint {
+        font-size: 11.5px;
+        color: var(--ink-2);
+        opacity: 0.8;
+      }
+
+      /* 列内容容器 */
+      .lane-body {
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        flex: 1;
+      }
+
+      /* 列体：极浅状态色底（约 4.5%），卡片纯白浮在上面 */
+      .lane--warn .lane-body {
+        background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 4.5%, #ffffff);
+      }
+      .lane--blue .lane-body {
+        background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 4.5%, #ffffff);
+      }
+      .lane--green .lane-body {
+        background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 4.5%, #ffffff);
+      }
+
+      /* =====================================================================
+         卡片通用样式 (Task Cards)
+         ===================================================================== */
+      .task-card {
+        background: #ffffff;
+        border: 1px solid var(--hairline);
+        border-radius: var(--dsw-radius-sm);
+        padding: 11px 13px;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        position: relative;
+        cursor: pointer;
+      }
+
+      .task-card:hover {
+        transform: translateY(-1.5px);
+        box-shadow: var(--card-hover-shadow);
+        border-color: var(--dsw-alias-border-l3);
+      }
+
+      .card-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .card-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+
+      .card-time {
+        font-size: 11.5px;
+        color: var(--ink-2);
+        opacity: 0.85;
+      }
+
+      .card-title {
+        margin: 0;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--ink);
+        line-height: 1.4;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .card-context {
+        font-size: 12px;
+        color: var(--ink-2);
+        line-height: 1.45;
+      }
+
+      /* 待回复卡片：醒目，强烈“等你决定”信号，但非粗暴红色横幅 */
+      .task-card--urgent {
+        border-color: var(--warn-line);
+        border-left: 4px solid var(--dsw-alias-state-warn-primary);
+        background: #ffffff;
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--dsw-alias-state-warn-primary) 12%, transparent);
+      }
+
+      .task-card--urgent:hover {
+        border-color: var(--dsw-alias-state-warn-primary);
+        box-shadow: 0 4px 16px color-mix(in srgb, var(--dsw-alias-state-warn-primary) 18%, transparent);
+      }
+
+      .task-card--urgent .card-chip {
+        background: var(--warn-tint);
+        color: var(--warn-ink);
+        border: 1px solid var(--warn-line);
+      }
+
+      .task-card--urgent .card-title {
+        font-size: 14.5px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+
+      /* 待回复卡片里的变更预览：把"要决定什么"摊开，卡片本身撑起这一列的重量 */
+      .diff-preview {
+        border-left: 2px solid color-mix(in srgb, var(--dsw-alias-state-warn-primary) 45%, transparent);
+        padding: 2px 0 2px 9px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 11px;
+        line-height: 16px;
+        color: var(--ink-2);
+      }
+
+      .diff-preview .diff-rem {
+        color: var(--ink-2);
+      }
+
+      .diff-preview .diff-add {
+        color: var(--warn-ink);
+      }
+
+      .diff-sign {
+        display: inline-block;
+        width: 10px;
+        color: var(--ink-3);
+        font-weight: 700;
+      }
+
+      .diff-add .diff-sign {
+        color: var(--warn-ink);
+      }
+
+      /* 待回复卡片里的影响面信息：让这张卡"更有份量"，也压缩列底空白 */
+      .urgent-meta {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 12px;
+        padding: 8px 10px;
+        background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 6%, #ffffff);
+        border-radius: var(--dsw-radius-xs);
+      }
+
+      .urgent-meta-item {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        min-width: 0;
+      }
+
+      .urgent-meta-k {
+        font-size: 10.5px;
+        letter-spacing: 0.02em;
+        color: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 46%, var(--ink-3));
+      }
+
+      .urgent-meta-v {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--ink-2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .urgent-meta-v--warn {
+        color: var(--warn-ink);
+      }
+
+      .card-action-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 4px;
+        padding-top: 8px;
+        border-top: 1px dashed var(--hairline);
+      }
+
+      .btn-urgent-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        background: var(--dsw-alias-state-warn-primary);
+        color: #ffffff;
+        border-radius: 4px;
+        font-size: 11.5px;
+        font-weight: 600;
+        transition: background 0.12s ease;
+      }
+
+      .btn-urgent-action:hover {
+        background: var(--dsw-alias-state-warn-label);
+      }
+
+      .btn-ghost-action {
+        font-size: 11.5px;
+        color: var(--ink-2);
+        padding: 4px 8px;
+        border-radius: 4px;
+      }
+
+      .btn-ghost-action:hover {
+        background: var(--dsw-alias-interactive-bg-hover-solid);
+        color: var(--ink);
+      }
+
+      /* 运行中卡片：带有活力动效/蓝线 */
+      .task-card--running {
+        border-left: 3px solid var(--dsw-alias-state-business-primary);
+      }
+
+      .task-card--running .card-chip {
+        background: var(--blue-tint);
+        color: var(--blue-ink);
+      }
+
+      .running-pulse {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--dsw-alias-state-business-primary);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 30%, transparent);
+      }
+
+      /* 细致微型进度线 */
+      .progress-line-track {
+        height: 2px;
+        background: var(--hairline);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 2px;
+      }
+
+      .progress-line-fill {
+        height: 100%;
+        background: var(--dsw-alias-state-business-primary);
+        border-radius: 2px;
+      }
+
+      /* 已完成未读卡片：绿线与标为已读快捷入口 */
+      .task-card--unread {
+        border-left: 3px solid var(--dsw-alias-state-success-primary);
+      }
+
+      .task-card--unread .card-chip {
+        background: var(--green-tint);
+        color: var(--green-ink);
+      }
+
+      .unread-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--dsw-alias-state-success-primary);
+      }
+
+      .card-hover-affordance {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 6px;
+        font-size: 11px;
+        color: var(--ink-3);
+        border-top: 1px solid var(--hairline);
+        margin-top: 2px;
+      }
+
+      .quick-mark-read {
+        color: var(--green-ink);
+        font-weight: 500;
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: 3px;
+      }
+
+      .quick-mark-read:hover {
+        background: var(--green-tint);
+        text-decoration: underline;
+      }
+
+      .arrow-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        color: var(--ink-3);
+        transition: transform 0.12s ease, color 0.12s ease;
+      }
+
+      .task-card:hover .arrow-action {
+        transform: translateX(2px);
+        color: var(--ink);
+      }
+
+      /* 列内空态槽位：吃掉本列剩余高度，三列底线对齐又不像一个大空盒 */
+      .lane-balance-slot {
+        flex: 1 1 auto;
+        min-height: 104px;
+        margin-top: 6px;
+        padding: 26px 16px 18px;
+        border-top: 1px dashed color-mix(in srgb, var(--ink-3) 34%, transparent);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: 7px;
+        color: var(--ink-3);
+      }
+
+      .lane-balance-slot .slot-icon {
+        color: var(--ink-3);
+        opacity: 0.55;
+        margin-bottom: 1px;
+      }
+
+      .lane-balance-slot .slot-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--ink-2);
+        letter-spacing: 0.01em;
+      }
+
+      .lane-balance-slot .slot-desc {
+        font-size: 11.5px;
+        line-height: 1.55;
+        color: var(--ink-2);
+        opacity: 0.78;
+        max-width: 240px;
+      }
+
+      .lane-status-footer {
+        padding: 8px 12px;
+        font-size: 11px;
+        color: var(--ink-3);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #ffffff;
+        border-top: 1px solid var(--hairline);
+      }
+
+      /* =====================================================================
+         底部折叠区：「更早完成」归档 (2 个已读)
+         ===================================================================== */
+      .history-section {
+        margin-top: 18px;
+        background: #ffffff;
+        border: 1px solid var(--hairline);
+        border-radius: var(--dsw-radius-sm);
+        overflow: hidden;
+      }
+
+      .history-toggle {
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #ffffff;
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.15s ease;
+      }
+
+      .history-toggle:hover {
+        background: var(--dsw-alias-interactive-bg-hover-solid);
+      }
+
+      .history-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 12.5px;
+        font-weight: 500;
+        color: var(--ink-2);
+      }
+
+      .history-samples {
+        font-size: 12px;
+        color: var(--ink-3);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .history-chip {
+        background: var(--dsw-alias-interactive-bg-hover-solid);
+        padding: 1px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        color: var(--ink-3);
+      }
+
+      .history-right {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11.5px;
+        color: var(--ink-3);
+      }
+
+      .history-list {
+        border-top: 1px solid var(--hairline);
+        background: #fafbfc;
+        padding: 6px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .history-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 8px;
+        font-size: 12px;
+        color: var(--ink-2);
+        border-radius: 4px;
+      }
+
+      .history-item:hover {
+        background: #ffffff;
+      }
+
+      .history-item-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .history-check-ico {
+        color: var(--ink-3);
+      }
+
+      /* 窄屏响应式退化 */
+      @media (max-width: 1000px) {
+        .board-lanes {
+          grid-template-columns: 1fr;
+        }
+        .app-shell {
+          padding: 16px;
+        }
+        .header-actions {
+          flex-wrap: wrap;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <!-- 页面顶部标题与操作栏 -->
+      <header class="page-header">
+        <div class="header-info">
+          <div class="eyebrow">
+            <span class="eyebrow-dot"></span>
+            TASK NOTIFIER
+          </div>
+          <div class="title-row">
+            <h1 class="page-title">任务<span class="title-en">Tasks</span></h1>
+            <span class="title-total-pill mono">全部 8</span>
+          </div>
+          <p class="page-desc">
+            筛选待回复、进行中与已完成未读的任务；任务完成时播放提示音并弹通知。
+          </p>
+        </div>
+
+        <div class="header-actions">
+          <!-- 浏览器通知：已开启 状态样式 -->
+          <div class="status-indicator-badge" title="系统及浏览器通知服务正常运行中">
+            <span class="status-dot"></span>
+            <span>浏览器通知：已开启</span>
+          </div>
+
+          <!-- 次要操作 -->
+          <button class="btn-secondary" type="button" title="播放提示音效">
+            <svg class="ico" viewBox="0 0 24 24">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+            </svg>
+            <span>试听提示音</span>
+          </button>
+
+          <button class="btn-secondary" type="button" title="向操作系统发送一条模拟测试通知">
+            <svg class="ico" viewBox="0 0 24 24">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+            <span>试发系统通知</span>
+          </button>
+
+          <!-- 主操作按钮：全部标为已读（3） -->
+          <button class="btn-primary" type="button" title="将 3 个未读任务全部设为已读">
+            <svg class="ico" viewBox="0 0 24 24">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>全部标为已读</span>
+            <span class="badge-count mono">3</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- 搜索与状态过滤条 -->
+      <section class="filter-toolbar">
+        <div class="search-box">
+          <svg class="ico search-icon" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input
+            type="search"
+            class="search-input"
+            placeholder="按标题搜索…"
+            value=""
+            aria-label="按标题搜索任务"
+          />
+          <span class="search-shortcut mono">⌘K</span>
+        </div>
+
+        <div class="filter-status-summary">
+          <button class="btn-util" type="button">
+            <svg class="ico" viewBox="0 0 24 24">
+              <path d="M3 6h18"></path>
+              <path d="M7 12h10"></path>
+              <path d="M10 18h4"></path>
+            </svg>
+            <span>按最近更新</span>
+            <svg class="ico" viewBox="0 0 24 24">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+          <span class="btn-util-sep"></span>
+          <button class="btn-util" type="button" title="筛选任务状态">
+            <svg class="ico" viewBox="0 0 24 24">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+            </svg>
+            <span>筛选</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 三列看板主体 (Kanban Lanes) -->
+      <main class="board-lanes">
+        <!-- 列 1：待回复 (Amber / Warning) -->
+        <section class="lane lane--warn" aria-label="待回复列">
+          <header class="lane-header">
+            <div class="lane-title-group">
+              <div class="lane-icon-wrap">
+                <svg class="ico" viewBox="0 0 24 24">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+              </div>
+              <h2 class="lane-title">待回复</h2>
+              <span class="lane-count-badge mono">1</span>
+            </div>
+            <span class="lane-meta-hint">需要你做决定</span>
+          </header>
+
+          <div class="lane-body">
+            <!-- 待回复卡片（显著的高优先级提醒） -->
+            <article class="task-card task-card--urgent">
+              <div class="card-header-row">
+                <span class="card-chip">
+                  <svg class="ico" style="width: 12px; height: 12px;" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                  等待审批 · 等你决定
+                </span>
+                <span class="card-time mono">刚刚 (20 秒)</span>
+              </div>
+
+              <h3 class="card-title">确认是否覆盖线上数据</h3>
+
+              <div class="card-context">
+                生产环境迁移脚本即将覆盖目标库，检测到 12,480 条冲突记录，需要你确认覆盖或中止。
+              </div>
+
+              <div class="diff-preview mono">
+                <div class="diff-rem"><span class="diff-sign">−</span>覆盖 users · orders 共 12,480 行</div>
+                <div class="diff-add"><span class="diff-sign">+</span>写入新快照 snap_2026_11_06</div>
+              </div>
+
+              <div class="urgent-meta">
+                <div class="urgent-meta-item">
+                  <span class="urgent-meta-k">影响范围</span>
+                  <span class="urgent-meta-v">users · orders · events</span>
+                </div>
+                <div class="urgent-meta-item">
+                  <span class="urgent-meta-k">风险 / 回滚</span>
+                  <span class="urgent-meta-v urgent-meta-v--warn">中 · 可回滚</span>
+                </div>
+              </div>
+
+              <div class="card-action-bar">
+                <button class="btn-urgent-action" type="button">
+                  <span>立即审批</span>
+                  <svg class="ico" style="width: 12px; height: 12px;" viewBox="0 0 24 24">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </button>
+                <button class="btn-ghost-action" type="button">查看差异</button>
+              </div>
+            </article>
+
+            <!-- 列视觉平衡槽位（避免单卡片时出现突兀大片空洞） -->
+            <div class="lane-balance-slot">
+              <svg class="ico slot-icon" viewBox="0 0 24 24">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+              <div class="slot-title">无其他阻塞审批</div>
+              <div class="slot-desc">
+                当后台代理或工具需要人工介入授权时，将在此列顶部实时唤起。
+              </div>
+            </div>
+          </div>
+
+          <footer class="lane-status-footer">
+            <span>最长等待：20 秒</span>
+            <span class="mono">1 项待办</span>
+          </footer>
+        </section>
+
+        <!-- 列 2：运行中 (Blue / Business) -->
+        <section class="lane lane--blue" aria-label="运行中列">
+          <header class="lane-header">
+            <div class="lane-title-group">
+              <div class="lane-icon-wrap">
+                <svg class="ico" viewBox="0 0 24 24">
+                  <line x1="12" y1="2" x2="12" y2="6"></line>
+                  <line x1="12" y1="18" x2="12" y2="22"></line>
+                  <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                  <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                  <line x1="2" y1="12" x2="6" y2="12"></line>
+                  <line x1="18" y1="12" x2="22" y2="12"></line>
+                  <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                  <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+                </svg>
+              </div>
+              <h2 class="lane-title">运行中</h2>
+              <span class="lane-count-badge mono">2</span>
+            </div>
+            <span class="lane-meta-hint">后台并发处理</span>
+          </header>
+
+          <div class="lane-body">
+            <!-- 运行中卡片 1 -->
+            <article class="task-card task-card--running">
+              <div class="card-header-row">
+                <span class="card-chip">
+                  <span class="running-pulse"></span>
+                  正在执行
+                </span>
+                <span class="card-time mono">42 秒前</span>
+              </div>
+
+              <h3 class="card-title">重构通知去重逻辑</h3>
+
+              <div class="card-context">
+                正在校验 LRU 缓存与窗口内防抖算法，已完成单元测试用例编写。
+              </div>
+
+              <div class="progress-line-track">
+                <div class="progress-line-fill" style="width: 65%;"></div>
+              </div>
+
+              <div class="card-hover-affordance">
+                <span>耗时 42s · Subagent #1</span>
+                <span class="arrow-action">
+                  <span>查看进度</span>
+                  <svg class="ico" style="width: 12px; height: 12px;" viewBox="0 0 24 24">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </span>
+              </div>
+            </article>
+
+            <!-- 运行中卡片 2 -->
+            <article class="task-card task-card--running">
+              <div class="card-header-row">
+                <span class="card-chip">
+                  <span class="running-pulse"></span>
+                  正在执行
+                </span>
+                <span class="card-time mono">3 分钟前</span>
+              </div>
+
+              <h3 class="card-title">抓取竞品价格快照</h3>
+
+              <div class="card-context">
+                Playwright 正在拉取第 3/5 个站点的多规格 SKU 定价矩阵。
+              </div>
+
+              <div class="progress-line-track">
+                <div class="progress-line-fill" style="width: 40%;"></div>
+              </div>
+
+              <div class="card-hover-affordance">
+                <span>耗时 3m · Subagent #2</span>
+                <span class="arrow-action">
+                  <span>查看进度</span>
+                  <svg class="ico" style="width: 12px; height: 12px;" viewBox="0 0 24 24">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </span>
+              </div>
+            </article>
+
+            <!-- 运行中视觉平衡槽位 -->
+            <div class="lane-balance-slot">
+              <svg class="ico slot-icon" viewBox="0 0 24 24">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
+              <div class="slot-title">后台调度就绪</div>
+              <div class="slot-desc">并发槽位 2/4 占用 · 运行环境健康</div>
+            </div>
+          </div>
+
+          <footer class="lane-status-footer">
+            <span>并发容量：2 / 4 运行中</span>
+            <span class="mono">2 项活跃</span>
+          </footer>
+        </section>
+
+        <!-- 列 3：已完成未读 (Green / Success) -->
+        <section class="lane lane--green" aria-label="已完成未读列">
+          <header class="lane-header">
+            <div class="lane-title-group">
+              <div class="lane-icon-wrap">
+                <svg class="ico" viewBox="0 0 24 24">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+              </div>
+              <h2 class="lane-title">已完成未读</h2>
+              <span class="lane-count-badge mono">3</span>
+            </div>
+            <span class="lane-meta-hint">等待你查阅</span>
+          </header>
+
+          <div class="lane-body">
+            <!-- 未读卡片 1 -->
+            <article class="task-card task-card--unread">
+              <div class="card-header-row">
+                <span class="card-chip">
+                  <span class="unread-dot"></span>
+                  未读更新
+                </span>
+                <span class="card-time mono">2 分钟前</span>
+              </div>
+
+              <h3 class="card-title">整理会议纪要</h3>
+
+              <div class="card-context">
+                已生成 3 份要点概览，提炼 5 项后续 Action Item 并自动入库。
+              </div>
+
+              <div class="card-hover-affordance">
+                <span class="quick-mark-read">标为已读</span>
+                <span class="arrow-action">
+                  <span>查看输出</span>
+                  <svg class="ico" style="width: 12px; height: 12px;" viewBox="0 0 24 24">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </span>
+              </div>
+            </article>
+
+            <!-- 未读卡片 2 -->
+            <article class="task-card task-card--unread">
+              <div class="card-header-row">
+                <span class="card-chip">
+                  <span class="unread-dot"></span>
+                  未读更新
+                </span>
+                <span class="card-time mono">12 分钟前</span>
+              </div>
+
+              <h3 class="card-title">修复移动端侧栏折叠</h3>
+
+              <div class="card-context">
+                8 项自动化端到端测试均已通过，断点样式与手势冲突已排查。
+              </div>
+
+              <div class="card-hover-affordance">
+                <span class="quick-mark-read">标为已读</span>
+                <span class="arrow-action">
+                  <span>查看输出</span>
+                  <svg class="ico" style="width: 12px; height: 12px;" viewBox="0 0 24 24">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </span>
+              </div>
+            </article>
+
+            <!-- 未读卡片 3 -->
+            <article class="task-card task-card--unread">
+              <div class="card-header-row">
+                <span class="card-chip">
+                  <span class="unread-dot"></span>
+                  未读更新
+                </span>
+                <span class="card-time mono">58 分钟前</span>
+              </div>
+
+              <h3 class="card-title">补齐插件市场截图</h3>
+
+              <div class="card-context">
+                已在 1440×900 分辨率下渲染浅色/深色主题共 4 张高保真图档。
+              </div>
+
+              <div class="card-hover-affordance">
+                <span class="quick-mark-read">标为已读</span>
+                <span class="arrow-action">
+                  <span>查看输出</span>
+                  <svg class="ico" style="width: 12px; height: 12px;" viewBox="0 0 24 24">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </span>
+              </div>
+            </article>
+          </div>
+
+          <footer class="lane-status-footer">
+            <span>3 项成果待查收</span>
+            <span class="mono">最新 2m 前</span>
+          </footer>
+        </section>
+      </main>
+
+      <!-- 底部收拢区：「更早完成」折叠入口 (2 个已读) -->
+      <details class="history-section">
+        <summary class="history-toggle">
+          <div class="history-left">
+            <svg class="ico" viewBox="0 0 24 24">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>更早完成的任务 (2 个已读)</span>
+            <div class="history-samples">
+              <span class="history-chip">写好 README 安装说明 · 3 小时前</span>
+              <span class="history-chip">整理发布检查清单 · 昨天</span>
+            </div>
+          </div>
+          <div class="history-right">
+            <span>展开历史</span>
+            <svg class="ico" viewBox="0 0 24 24">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
+        </summary>
+        <div class="history-list">
+          <div class="history-item">
+            <div class="history-item-left">
+              <svg class="ico history-check-ico" viewBox="0 0 24 24">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span>写好 README 安装说明</span>
+            </div>
+            <span class="mono card-time">3 小时前 · 已读</span>
+          </div>
+          <div class="history-item">
+            <div class="history-item-left">
+              <svg class="ico history-check-ico" viewBox="0 0 24 24">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span>整理发布检查清单</span>
+            </div>
+            <span class="mono card-time">昨天 · 已读</span>
+          </div>
+        </div>
+      </details>
+    </div>
+  </body>
+</html>
