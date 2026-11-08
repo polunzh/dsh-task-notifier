@@ -557,6 +557,8 @@
         var archiveParam = params.get("archive") === "1";
         var focusTab = params.get("focus") === "tab";
         var debugChrome = params.get("debug") === "1";
+        // 宿主在重载后会恢复上次打开的主视图会话；?active=<id> 复现这个起点。
+        var activeSessionParam = params.get("active") || "";
         // fake ctx.locale 的 active 语言：默认中文，?locale=en 切英文。
         var localeTag = params.get("locale") === "en" ? "en-US" : "zh-CN";
         var shellLang = localeTag.toLowerCase().indexOf("zh") === 0 ? "zh" : "en";
@@ -875,6 +877,11 @@
           };
         }
 
+        /* 调试/校验钩子：页面上可以直接读到 mock 任务表（含 unread 标记）。 */
+        window.__previewTasks = function () {
+          return clone(tasks);
+        };
+
         /* fetch 桩：拦截 /task-notifier/api/*，其余请求放行（预览页本身不发请求）。 */
         var realFetch = typeof window.fetch === "function" ? window.fetch.bind(window) : null;
         window.fetch = async function (input, init) {
@@ -981,6 +988,32 @@
         var cleanups = [];
         var openedSessions = [];
 
+        /* 宿主 uiWorkspace.selection 的最小替身：snapshot store。
+           真实宿主在切换主视图会话时发布 { sessionId }，插件据此同步已读。 */
+        var selectionListeners = new Set();
+        var selectionValue = activeSessionParam ? { sessionId: activeSessionParam } : {};
+        var selection = {
+          getSnapshot: function () {
+            return selectionValue;
+          },
+          subscribe: function (listener) {
+            selectionListeners.add(listener);
+            return function () {
+              selectionListeners.delete(listener);
+            };
+          },
+        };
+        function publishSelection(value) {
+          selectionValue = value;
+          selectionListeners.forEach(function (listener) {
+            try {
+              listener();
+            } catch (error) {
+              /* 观察者失败不影响发布 */
+            }
+          });
+        }
+
         var ctx = {
           inject: ["slots", "layout", "uiWorkspace", "locale"],
           locale: localeApi,
@@ -1007,10 +1040,12 @@
             frame: { topClearance: 0, leadingClearance: 0 },
           },
           uiWorkspace: {
+            selection: selection,
             openSession: function (target) {
               var sessionId =
                 typeof target === "string" ? target : (target && (target.sessionId || target.id)) || "";
               openedSessions.push(sessionId);
+              publishSelection({ sessionId: sessionId });
               return Promise.resolve({ ok: true, sessionId: sessionId });
             },
           },

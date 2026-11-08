@@ -94,3 +94,12 @@ test("不再在后台自动请求通知权限", () => {
   const requestCalls = [...source.matchAll(/requestBrowserPermission\(\)/g)].length;
   assert.equal(requestCalls, 2, "仅按钮点击与权限刷新各一处调用");
 });
+
+test("侧边栏进入会话自动同步已读状态", () => {
+  // 会话切换订阅：宿主 selection 缺失时必须静默跳过，不能把面板弄挂
+  assert.match(source, /const selection = ctx\.uiWorkspace\?\.selection;/);
+  assert.match(source, /selection\.subscribe\(syncActive\)/);
+  assert.match(source, /store\.syncActiveSessionRead\(activeId\)/);
+  assert.match(source, /firstLoad\(\)\.then\(syncActive, \(\) => \{\}\)/);
+  assert.match(source, /disposeSelection\(\)/);
+});
