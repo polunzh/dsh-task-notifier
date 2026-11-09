@@ -47,8 +47,23 @@ jobs:
         run: |
           PACKAGE_NAME=$(npm pkg get name | tr -d '"')
           PACKAGE_VERSION="${{ steps.package.outputs.version }}"
+          # 已发布的版本直接跳过
           if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1; then
             echo "$PACKAGE_NAME@$PACKAGE_VERSION is already published; skipping."
             exit 0
           fi
-          npm publish --access public
+          # 新版本先进入 npm 的 staged 发布队列，等维护者在 npmjs.com 批准后
+          # 才会出现在 registry 上；同一版本的重复推送会报 409，这属于正常情况。
+          set +e
+          PUBLISH_OUTPUT=$(npm publish --access public 2>&1)
+          PUBLISH_STATUS=$?
+          set -e
+          printf '%s\n' "$PUBLISH_OUTPUT"
+          if [ "$PUBLISH_STATUS" -ne 0 ]; then
+            if printf '%s' "$PUBLISH_OUTPUT" | grep -q "Cannot publish over previously staged version"; then
+              echo "$PACKAGE_NAME@$PACKAGE_VERSION is already staged; approve it at https://www.npmjs.com/package/$PACKAGE_NAME."
+              exit 0
+            fi
+            exit "$PUBLISH_STATUS"
+          fi
+          echo "$PACKAGE_NAME@$PACKAGE_VERSION is staged; approve it at https://www.npmjs.com/package/$PACKAGE_NAME to release."
