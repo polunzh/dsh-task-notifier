@@ -426,6 +426,15 @@ test("心跳记录语言，/test 回报 locale 并受冷却限制", async () => 
   assert.equal(second.status, 429, "冷却期内必须拒绝，避免被反复触发刷屏");
 });
 
+test("写操作缺 application/json 会被 415 挡掉（客户端必须走 postJson）", async () => {
+  const harness = createHarness({ config: { osNotify: "off" } });
+  // 旧客户端「试发系统通知」就是裸 fetch POST，被这里挡下来后一直报发送失败
+  const bare = await harness.call({ method: "POST", url: "/task-notifier/api/test", headers: {}, body: {} });
+  assert.equal(bare.status, 415);
+  const withJson = await harness.call({ method: "POST", url: "/task-notifier/api/test", headers: JSON_HEADERS, body: {} });
+  assert.equal(withJson.status, 200);
+});
+
 test("osNotify=off 的 disabled 判定先于平台限制，各平台答案一致", async () => {
   const descriptor = Object.getOwnPropertyDescriptor(process, "platform");
   const harness = createHarness({ config: { osNotify: "off" } });
@@ -631,6 +640,13 @@ test("会话级 Agent 失败也会标成中断（含欠费识别）", async () =
   assert.equal(task.interruptedKind, "quota");
   assert.equal(task.interruptedMessage, "Insufficient balance");
   assert.equal(task.unread, true);
+  assert.ok(task.completedAt > 0, "会话级失败也是一次收尾：客户端靠 completedAt 判断这是不是新结果");
+
+  // 同一个错误反复上报不该重复算成新结果（否则会反复弹通知）
+  const firstCompletedAt = task.completedAt;
+  onError("sess-fatal", "Insufficient balance");
+  task = (await harness.call()).json.tasks.find((item) => item.id === "sess-fatal");
+  assert.equal(task.completedAt, firstCompletedAt);
 
   onError("sess-fatal-2", "boom");
   task = (await harness.call()).json.tasks.find((item) => item.id === "sess-fatal-2");
