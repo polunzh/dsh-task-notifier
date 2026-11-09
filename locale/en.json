@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Task Notifier",
-    "description": "Plays a chime and raises a system/browser notification when a task finishes; the Tasks sidebar panel filters tasks awaiting your reply, running and completed-unread."
+    "description": "Plays a chime and raises a system/browser notification when a task finishes or is interrupted; the Tasks sidebar panel filters tasks awaiting your reply, running and unread results."
   }
 }

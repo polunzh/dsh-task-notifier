@@ -497,3 +497,124 @@ test("长轮询的等待器不能 unref（否则事件循环先空掉，Promise 
   assert.ok(start > 0 && end > start, "waitForRevision 应当还在");
   assert.equal(/\.unref\(/.test(source.slice(start, end)), false);
 });
+
+test("欠费收尾会标记中断、保持未读，并在重新开跑时清空", async () => {
+  const harness = createHarness();
+  const status = harness.handlers.get("api-session/status");
+  const onEvent = harness.handlers.get("session/event");
+  harness.handlers.get("api-session/added")({ id: "sess-quota", title: "跑一个长任务" });
+  status("sess-quota", true);
+
+  onEvent(
+    { id: "sess-quota" },
+    { type: "turn/end", data: { turn: 1, reason: { kind: "error", error: { code: "QUOTA", message: "Insufficient balance" } } } },
+  );
+  status("sess-quota", false);
+
+  let task = (await harness.call()).json.tasks.find((item) => item.id === "sess-quota");
+  assert.equal(task.running, false);
+  assert.equal(task.unread, true);
+  assert.equal(task.interrupted, true);
+  assert.equal(task.interruptedKind, "quota");
+  assert.equal(task.interruptedMessage, "Insufficient balance");
+
+  // 中断标记要进状态文件，重启后还能显示「欠费中断」
+  await new Promise((resolve) => setTimeout(resolve, 800));
+  const file = join(harness.home, "storages", "dsh-task-notifier", "state.json");
+  const saved = JSON.parse(readFileSync(file, "utf8")).tasks.find((item) => item.id === "sess-quota");
+  assert.equal(saved.interrupted, true);
+  assert.equal(saved.interruptedKind, "quota");
+
+  // 用户重新发消息开跑：中断状态必须被清掉，不能一直挂着欠费徽章
+  status("sess-quota", true);
+  task = (await harness.call()).json.tasks.find((item) => item.id === "sess-quota");
+  assert.equal(task.running, true);
+  assert.equal(task.interrupted, false);
+  assert.equal(task.interruptedKind, null);
+  assert.equal(task.interruptedMessage, null);
+});
+
+test("进程退出与崩溃恢复的收尾都按「退出中断」记录，主动停止不算", async () => {
+  const harness = createHarness();
+  const status = harness.handlers.get("api-session/status");
+  const onEvent = harness.handlers.get("session/event");
+  const read = async (id) => (await harness.call()).json.tasks.find((item) => item.id === id);
+
+  status("sess-exit", true);
+  onEvent({ id: "sess-exit" }, { type: "turn/end", data: { turn: 1, reason: { kind: "interrupted" } } });
+  status("sess-exit", false);
+  let task = await read("sess-exit");
+  assert.equal(task.interrupted, true);
+  assert.equal(task.interruptedKind, "process_exit");
+  assert.equal(task.interruptedMessage, null);
+  assert.equal(task.unread, true);
+
+  // 关闭进程时级联取消（disposed）同样算退出中断
+  status("sess-disposed", true);
+  onEvent({ id: "sess-disposed" }, { type: "turn/end", data: { turn: 2, reason: { kind: "aborted", reason: { kind: "disposed" } } } });
+  status("sess-disposed", false);
+  task = await read("sess-disposed");
+  assert.equal(task.interrupted, true);
+  assert.equal(task.interruptedKind, "process_exit");
+
+  // 用户自己点停止：按正常收尾，不挂中断徽章
+  status("sess-userstop", true);
+  onEvent({ id: "sess-userstop" }, { type: "turn/end", data: { turn: 3, reason: { kind: "aborted", reason: { kind: "user" } } } });
+  status("sess-userstop", false);
+  task = await read("sess-userstop");
+  assert.equal(task.interrupted, false);
+  assert.equal(task.unread, true);
+
+  // 正常完成也不能被误标成中断
+  status("sess-ok", true);
+  onEvent({ id: "sess-ok" }, { type: "turn/end", data: { turn: 4, reason: { kind: "completed" } } });
+  status("sess-ok", false);
+  task = await read("sess-ok");
+  assert.equal(task.interrupted, false);
+});
+
+test("重启时把上次仍在运行的任务补成退出中断", async () => {
+  const home = mkdtempSync(join(tmpdir(), "dtn-host-interrupt-"));
+  const dir = join(home, "storages", "dsh-task-notifier");
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  writeFileSync(
+    join(dir, "state.json"),
+    JSON.stringify({
+      version: 1,
+      savedAt: 100,
+      tasks: [
+        { id: "sess-was-running", title: "退出时还在跑", running: true, startedAt: 10, completedAt: 0, unread: false, changeAt: 20 },
+        { id: "sess-was-done", title: "已经收过尾", running: false, completedAt: 30, unread: false, changeAt: 30 },
+      ],
+    }),
+  );
+
+  const harness = createHarness({ home });
+  const tasks = (await harness.call()).json.tasks;
+  const running = tasks.find((item) => item.id === "sess-was-running");
+  assert.ok(running, "上次运行中的任务必须还在面板里");
+  assert.equal(running.running, false);
+  assert.equal(running.interrupted, true);
+  assert.equal(running.interruptedKind, "process_exit");
+  assert.equal(running.unread, true, "退出中断的任务要等用户查阅");
+  assert.equal(running.completedAt > 0, true, "要有收尾时间，历史列表才有排序依据");
+
+  const done = tasks.find((item) => item.id === "sess-was-done");
+  assert.equal(done.interrupted, false);
+  assert.equal(done.unread, false);
+});
+
+test("中断原因会被净化后再进任务表", async () => {
+  const harness = createHarness();
+  const onEvent = harness.handlers.get("session/event");
+  harness.handlers.get("api-session/status")("sess-dirty", true);
+  onEvent(
+    { id: "sess-dirty" },
+    { type: "turn/end", data: { turn: 1, reason: { kind: "error", error: { code: "UNKNOWN", message: `炸弹\u0000\n${"长".repeat(400)}` } } } },
+  );
+  const task = (await harness.call()).json.tasks.find((item) => item.id === "sess-dirty");
+  assert.equal(task.interruptedKind, "error");
+  assert.equal(task.interruptedMessage.includes("\u0000"), false);
+  assert.equal(task.interruptedMessage.includes("\n"), false);
+  assert.ok(task.interruptedMessage.length <= 160);
+});

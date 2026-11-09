@@ -11,7 +11,7 @@
 
 ---
 
-> DeepSeek Harness（DSH）Web 插件：**任务完成时提醒你**，并提供一屏同时展示「待回复 / 运行中 / 已完成未读」的三列看板任务面板。
+> DeepSeek Harness（DSH）Web 插件：**任务完成或中断时提醒你**，并提供一屏同时展示「待回复 / 运行中 / 未读结果」的三列看板任务面板。
 
 ### 它解决什么
 
@@ -22,7 +22,8 @@ DSH 跑长任务时，你切走去干别的，回来才发现早就跑完了。�
   - 页面开着且已授权 → 浏览器 `Notification`，点一下跳回对应会话；
   - 页面关了或未授权 → 宿主在 macOS 上弹系统通知（`osascript`），不会双弹（心跳判重）。
 - **待回复状态**：Agent 向你提问、等你审阅计划或等你审批时，侧栏图标亮起琥珀色脉冲点，面板「待回复」列置顶提示，点开直接回到那个等你决定的会话。
-- **三列看板面板**：侧边栏图标（带未读角标）→ 一屏同时看到**待回复 / 运行中 / 已完成未读**三列，顶部 chip 可单独筛选单列，底部「更早完成」可展开历史；支持按标题搜索、全部标为已读、试听提示音、试发系统通知。
+- **中断也会展示**：退出 DSH 或崩溃时未收尾的轮次、欠费/额度耗尽、执行报错，都会以「已中断 · 退出 / 欠费 / 报错」的警告卡片留在「未读结果」里；系统通知同步说明中断原因，重新发消息开跑时自动清掉中断标记。
+- **三列看板面板**：侧边栏图标（带未读角标）→ 一屏同时看到**待回复 / 运行中 / 未读结果**三列，顶部 chip 可单独筛选单列，底部「更早的任务」可展开历史；支持按标题搜索、全部标为已读、试听提示音、试发系统通知。
 - **自动同步已读**：切换会话时自动标记未读任务为已读。
 - **未读不丢**：状态写在 `$DSH_HOME/storages/dsh-task-notifier/state.json`，重启后还在。
 - **中英双语**：界面与系统通知文案跟随宿主语言（zh / en）。
@@ -103,9 +104,9 @@ dsh plugin --profile desktop add @polunzh/dsh-task-notifier
 |---|---|
 | ![浅色看板](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-light.png) | ![深色看板](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-dark.png) |
 
-| 已完成未读（单列筛选） | 待回复（单列筛选） |
+| 未读结果（单列筛选，含中断卡片） | 待回复（单列筛选） |
 |---|---|
-| ![已完成未读](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/unread-tab.png) | ![待回复](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/needs-input.png) |
+| ![未读结果](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/unread-tab.png) | ![待回复](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/needs-input.png) |
 
 | 宽屏收敛（1920×1080） | 移动端响应式（390×844） |
 |---|---|
@@ -116,7 +117,7 @@ dsh plugin --profile desktop add @polunzh/dsh-task-notifier
 ### 开发
 
 ```bash
-npm test              # node:test，60 个用例（含侧边栏已读同步、安全边界与中英字典一致性）
+npm test              # node:test，中断识别、安全边界、已读同步与中英字典一致性
 npm run preview       # 本地预览页（真实 client.js + 模拟数据）
 npm run screenshot    # 重新生成 preview/screenshots/*.png
 ```

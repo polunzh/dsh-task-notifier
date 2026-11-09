@@ -77,7 +77,22 @@ test("字典外没有遗留的硬编码面板文案", () => {
 });
 
 test("浏览器通知正文也走文案表", () => {
-  assert.match(source, /new Notification\(title, \{ body: t\("notify\.body"\), tag: NS \}\)/);
+  assert.match(source, /new Notification\(title, \{ body: t\(bodyKey\), tag: NS \}\)/);
+  assert.match(source, /task\.interrupted \? "notify\.interrupted" : "notify\.body"/);
+  assert.ok(zhKeys.has("notify.body") && zhKeys.has("notify.interrupted"));
+});
+
+test("中断任务有三种来源的徽章与原因文案", () => {
+  for (const kind of ["exit", "quota", "error"]) {
+    assert.ok(zhKeys.has(`badge.interrupted.${kind}`), `中文缺少 badge.interrupted.${kind}`);
+    assert.ok(enKeys.has(`badge.interrupted.${kind}`), `英文缺少 badge.interrupted.${kind}`);
+    assert.ok(zhKeys.has(`task.interrupted.${kind}`), `中文缺少 task.interrupted.${kind}`);
+    assert.ok(enKeys.has(`task.interrupted.${kind}`), `英文缺少 task.interrupted.${kind}`);
+  }
+  // 徽章必须优先于普通未读，且只有三种已知类型
+  assert.match(source, /if \(task\.interrupted\) \{/);
+  assert.match(source, /kind === "quota" \? "quota" : kind === "error" \? "error" : "exit"/);
+  assert.match(source, /t\(`badge\.interrupted\.\$\{interruptedKeyOf\(task\)\}`\)/);
 });
 
 test("禁用后必须停掉轮询（dispose + abort）", () => {

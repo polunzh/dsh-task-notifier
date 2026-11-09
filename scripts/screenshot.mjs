@@ -49,7 +49,7 @@ const shots = [
     theme: "light",
     kind: "filled",
     url: "?state=filled&theme=light",
-    narrative: "浅色 · 三列看板（待回复 / 运行中 / 已完成未读）",
+    narrative: "浅色 · 三列看板（待回复 / 运行中 / 未读结果，含中断）",
   },
   {
     name: "panel-dark",
@@ -58,7 +58,7 @@ const shots = [
     theme: "dark",
     kind: "filled",
     url: "?state=filled&theme=dark",
-    narrative: "深色 · 三列看板（待回复 / 运行中 / 已完成未读）",
+    narrative: "深色 · 三列看板（待回复 / 运行中 / 未读结果，含中断）",
   },
   {
     name: "panel-light-en",
@@ -79,7 +79,7 @@ const shots = [
     filter: "unread",
     focus: "tab",
     url: "?state=filled&theme=light&filter=unread&focus=tab",
-    narrative: "浅色 · 已完成未读单列筛选聚焦",
+    narrative: "浅色 · 未读结果单列筛选聚焦",
   },
   {
     name: "needs-input",
@@ -515,7 +515,7 @@ function validateShot(shot, info) {
         : [
             { lane: "input", label: "待回复" },
             { lane: "running", label: "运行中" },
-            { lane: "unread", label: "已完成未读" },
+            { lane: "unread", label: "未读结果" },
           ];
       for (const item of expectedChips) {
         const c = info.chips.find((chip) => chip.lane === item.lane);

@@ -11,7 +11,7 @@
 
 ---
 
-> A DeepSeek Harness (DSH) web plugin that **notifies you when a task finishes** and gives you a 3-lane kanban Tasks panel displaying sessions waiting on your input, running, and completed-but-unread.
+> A DeepSeek Harness (DSH) web plugin that **notifies you when a task finishes or is interrupted** and gives you a 3-lane kanban Tasks panel displaying sessions waiting on your input, running, and unread results.
 
 ### What it solves
 
@@ -22,7 +22,8 @@ Long-running DSH sessions finish while you are looking somewhere else. This plug
   - Page open and permission granted → browser `Notification`; clicking it jumps back to that session.
   - Page closed or permission not granted → the host raises a macOS system notification (`osascript`). A heartbeat keeps the two channels from double-firing.
 - **Needs-input state** — when an agent asks you a question, waits for a plan review, or waits on an approval, the sidebar icon shows an amber pulsing dot and the panel's **Needs input** lane highlights the session, so you can jump straight to the session blocked on you.
-- **Three-lane kanban panel** — a sidebar icon with an unread badge and three simultaneous lanes: **needs input / running / unread**, plus top chip filters for focusing on a single lane, collapsible history for earlier completed tasks, title search, mark-all-read, chime preview, and test notification.
+- **Interruptions stay visible** — a turn cut short by quitting or crashing DSH, by an exhausted quota or balance, or by an execution error keeps an "Interrupted · Exited / Quota / Error" warning card in **Unread**, and the system notification states the reason; sending a new message clears the mark.
+- **Three-lane kanban panel** — a sidebar icon with an unread badge and three simultaneous lanes: **needs input / running / unread**, plus top chip filters for focusing on a single lane, collapsible history for earlier tasks, title search, mark-all-read, chime preview, and test notification.
 - **Read state follows you** — opening a session from the sidebar marks its completed task read automatically.
 - **Unread survives restarts** — state lives in `$DSH_HOME/storages/dsh-task-notifier/state.json`.
 - **Bilingual UI** — interface and system-notification text follow the host language (zh / en).
@@ -114,7 +115,7 @@ If you previously installed a `link:` copy or an older version, **keep only one*
 |---|---|
 | ![Light](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-light.png) | ![Dark](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-dark.png) |
 
-| Unread (single lane filter) | Needs input (single lane filter) |
+| Unread (single lane filter, interrupted cards included) | Needs input (single lane filter) |
 |---|---|
 | ![Unread](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/unread-tab.png) | ![Needs input](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/needs-input.png) |
 
@@ -139,7 +140,7 @@ English UI (follows the host language):
 ### Development
 
 ```bash
-npm test              # node:test, 60 cases (read-sync, security boundaries, zh/en dictionary parity)
+npm test              # node:test: interruption detection, security boundaries, read-sync, zh/en dictionary parity
 npm run preview       # local preview page (real client.js + mock data)
 npm run screenshot    # regenerate preview/screenshots/*.png
 ```

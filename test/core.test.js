@@ -4,7 +4,9 @@ import {
   DEFAULTS,
   LIMITS,
   appleScriptQuote,
+  classifyTurnEnd,
   hostMessages,
+  isQuotaError,
   normalizeConfig,
   normalizeId,
   normalizeIds,
@@ -183,4 +185,122 @@ test("normalizeLocale 与 hostMessages 跟随 en/zh", () => {
   assert.equal(hostMessages("en").unnamed, "Untitled session");
   assert.match(hostMessages("en").completed("Review"), /Review.*done/);
   assert.match(hostMessages("zh").completed("改稿"), /改稿.*已完成/);
+});
+
+test("isQuotaError 只认额度/欠费这类终态错误", () => {
+  assert.equal(isQuotaError("insufficient_quota"), true);
+  assert.equal(isQuotaError("Insufficient Balance"), true);
+  assert.equal(isQuotaError("you have run out of credits"), true);
+  assert.equal(isQuotaError("余额不足"), true);
+  assert.equal(isQuotaError("rate limit exceeded"), false);
+  assert.equal(isQuotaError(""), false);
+  assert.equal(isQuotaError(undefined), false);
+});
+
+test("classifyTurnEnd 把中断、欠费、报错与主动停止区分开", () => {
+  // 崩溃恢复补写的收尾 = 进程退出
+  assert.deepEqual(classifyTurnEnd({ kind: "interrupted" }), {
+    interrupted: true,
+    kind: "process_exit",
+    message: null,
+  });
+  // 关进程/父会话级联取消也是退出
+  assert.deepEqual(classifyTurnEnd({ kind: "aborted", reason: { kind: "disposed" } }), {
+    interrupted: true,
+    kind: "process_exit",
+    message: null,
+  });
+  assert.equal(classifyTurnEnd({ kind: "aborted", reason: { kind: "parent" } }).kind, "process_exit");
+  // 用户主动点停止是有意为之
+  assert.equal(classifyTurnEnd({ kind: "aborted", reason: { kind: "user" } }), null);
+  // 插件取消（如账号退出）按报错算
+  assert.deepEqual(classifyTurnEnd({ kind: "aborted", reason: { kind: "hook", reason: "deepseek-account/signed-out" } }), {
+    interrupted: true,
+    kind: "error",
+    message: "deepseek-account/signed-out",
+  });
+  // 额度错误码与文案都识别为欠费
+  assert.deepEqual(
+    classifyTurnEnd({ kind: "error", error: { code: "ACCOUNT_QUOTA", message: "余额不足" } }),
+    { interrupted: true, kind: "quota", message: "余额不足" },
+  );
+  assert.deepEqual(
+    classifyTurnEnd({ kind: "error", error: { code: "PROVIDER", message: "Insufficient balance" } }),
+    { interrupted: true, kind: "quota", message: "Insufficient balance" },
+  );
+  // 其它失败按报错
+  assert.deepEqual(
+    classifyTurnEnd({ kind: "error", error: { code: "UNKNOWN", message: "boom" } }),
+    { interrupted: true, kind: "error", message: "boom" },
+  );
+  // 正常收尾 / 脏数据都不算中断
+  assert.equal(classifyTurnEnd({ kind: "completed" }), null);
+  assert.equal(classifyTurnEnd(undefined), null);
+  assert.equal(classifyTurnEnd("completed"), null);
+});
+
+test("classifyTurnEnd 截断与净化错误原因", () => {
+  const result = classifyTurnEnd({
+    kind: "error",
+    error: { code: "UNKNOWN", message: `a\u0000b\n${"长".repeat(400)}` },
+  });
+  assert.equal(result.kind, "error");
+  assert.equal(result.message.includes("\u0000"), false);
+  assert.equal(result.message.includes("\n"), false);
+  assert.ok(result.message.length <= LIMITS.maxReason);
+});
+
+test("parseState 解析中断字段并丢弃非法类型", () => {
+  const parsed = parseState({
+    version: 1,
+    tasks: [
+      {
+        id: "a",
+        title: "欠费中断",
+        completedAt: 5,
+        unread: true,
+        changeAt: 6,
+        interrupted: true,
+        interruptedKind: "quota",
+        interruptedMessage: "Insufficient balance",
+      },
+      { id: "b", interrupted: true, interruptedKind: "evil", completedAt: 1 },
+      { id: "c", interrupted: false, interruptedKind: "quota", interruptedMessage: "x" },
+      { id: "d", interrupted: true, interruptedMessage: `a\u0000b${"长".repeat(400)}` },
+    ],
+  });
+  assert.equal(parsed[0].interrupted, true);
+  assert.equal(parsed[0].interruptedKind, "quota");
+  assert.equal(parsed[0].interruptedMessage, "Insufficient balance");
+  assert.equal(parsed[1].interruptedKind, null, "未知中断类型不应被信任");
+  assert.equal(parsed[1].interrupted, true);
+  assert.equal(parsed[2].interrupted, false);
+  assert.equal(parsed[2].interruptedMessage, null);
+  assert.equal(parsed[3].interruptedKind, null);
+  assert.equal(parsed[3].interruptedMessage.includes("\u0000"), false);
+  assert.ok(parsed[3].interruptedMessage.length <= LIMITS.maxReason);
+});
+
+test("transitionTask 重新开跑时清掉中断标记，收尾时保留", () => {
+  const task = {
+    running: false,
+    startedAt: 0,
+    completedAt: 10,
+    unread: true,
+    changeAt: 10,
+    interrupted: true,
+    interruptedKind: "quota",
+    interruptedMessage: "余额不足",
+  };
+  transitionTask(task, true, 100);
+  assert.equal(task.interrupted, false);
+  assert.equal(task.interruptedKind, null);
+  assert.equal(task.interruptedMessage, null);
+
+  task.interrupted = true;
+  task.interruptedKind = "error";
+  task.interruptedMessage = "boom";
+  transitionTask(task, false, 200);
+  assert.equal(task.interrupted, true, "停止时不能把中断标记抹掉");
+  assert.equal(task.interruptedKind, "error");
 });
