@@ -433,7 +433,7 @@ async function inspectPage(cdp, sessionId) {
         archiveVisible: visible('.dtn-archive__bar'),
         archiveText: archiveBar ? (archiveBar.innerText || '').trim() : '',
         sidebarIcon: !!document.querySelector('#sidebar-slot svg'),
-        sidebarBadge: !!document.querySelector('#sidebar-slot svg text'),
+        sidebarBadge: !!document.querySelector('#sidebar-slot [data-dtn-badge]'),
         panelHeight: rootRect ? Math.round(rootRect.height) : 0,
         panelWidth: rootRect ? Math.round(rootRect.width) : 0,
         pageWidth: pageRect ? Math.round(pageRect.width) : 0,
