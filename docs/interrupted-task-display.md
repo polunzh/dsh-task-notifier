@@ -41,10 +41,13 @@
          标记 `task.interrupted = true`, `task.interruptedKind = "error"`, `task.interruptedMessage = reason.error.message`;
      - 若 `event.data.reason.kind === "completed"`：
        清空 `interrupted` 相关标记。
-2. **状态文件与重启检测 (`seedFromPersistence`)**：
+2. **会话级失败 (`api-session/error`)**：
+   - Agent 在没有落到持久轮次位置的失败（会话级故障）也标记为中断；错误文本命中欠费关键词时归为 `quota`，否则归为 `error`。
+
+3. **状态文件与重启检测 (`seedFromPersistence`)**：
    - 进程退出时，若任务处于 `running: true`，在重启后该任务被置为 `running: false`。
    - 若上次保存的状态是 `running: true`，说明进程在执行中被强退或退出，恢复时自动标记为 `interrupted = true`, `interruptedKind = "process_exit"`, `unread = true`，使退出的任务重新在面板中浮现，等待用户查阅。
-3. **状态转移 (`transitionTask`)**：
+4. **状态转移 (`transitionTask`)**：
    - 当任务再次变为 `running: true`（用户重新输入并发送）：自动重置 `interrupted = false`, `interruptedKind = null`, `interruptedMessage = null`。
 
 ### 2.3 状态持久化兼容 (`core.js`)

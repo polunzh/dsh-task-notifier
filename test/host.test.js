@@ -618,3 +618,27 @@ test("中断原因会被净化后再进任务表", async () => {
   assert.equal(task.interruptedMessage.includes("\n"), false);
   assert.ok(task.interruptedMessage.length <= 160);
 });
+
+test("会话级 Agent 失败也会标成中断（含欠费识别）", async () => {
+  const harness = createHarness();
+  const onError = harness.handlers.get("api-session/error");
+  assert.equal(typeof onError, "function", "应订阅 api-session/error");
+
+  harness.handlers.get("api-session/status")("sess-fatal", true);
+  onError("sess-fatal", "Insufficient balance");
+  let task = (await harness.call()).json.tasks.find((item) => item.id === "sess-fatal");
+  assert.equal(task.interrupted, true);
+  assert.equal(task.interruptedKind, "quota");
+  assert.equal(task.interruptedMessage, "Insufficient balance");
+  assert.equal(task.unread, true);
+
+  onError("sess-fatal-2", "boom");
+  task = (await harness.call()).json.tasks.find((item) => item.id === "sess-fatal-2");
+  assert.equal(task.interruptedKind, "error");
+  assert.equal(task.interruptedMessage, "boom");
+
+  onError(null, "ignored");
+  onError("", "ignored");
+  const tasks = (await harness.call()).json.tasks;
+  assert.equal(tasks.length, 2, "非法 id 不应造出任务");
+});
