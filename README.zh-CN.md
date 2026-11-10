@@ -4,6 +4,7 @@
 
 [![npm](https://img.shields.io/npm/v/@polunzh/dsh-task-notifier?label=npm&color=0891b2)](https://www.npmjs.com/package/@polunzh/dsh-task-notifier)
 [![开放插件市场](https://img.shields.io/endpoint?url=https%3A%2F%2Fdshopen.org%2Fbadge%2F%2540polunzh%2Fdsh-task-notifier.json)](https://dshopen.org/zh/plugins/@polunzh/dsh-task-notifier/)
+[![DSH 插件索引](https://dsh.127.dev/assets/badge-zh.svg)](https://dsh.127.dev/)
 [![license](https://img.shields.io/badge/license-MIT-16a34a)](./LICENSE)
 [![dsh](https://img.shields.io/badge/dsh-%3E%3D0.2.0--rc.2-2563eb)](./package.json)
 
