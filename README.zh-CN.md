@@ -1,6 +1,10 @@
+<img src="./icon.svg" alt="任务通知台图标" width="72" height="72" align="left" hspace="16" vspace="4">
+
 # 任务通知台 · Task Notifier
 
 **中文** | [English](./README.md)
+
+<br clear="left">
 
 [![npm](https://img.shields.io/npm/v/@polunzh/dsh-task-notifier?label=npm&color=0891b2)](https://www.npmjs.com/package/@polunzh/dsh-task-notifier)
 [![开放插件市场](https://img.shields.io/endpoint?url=https%3A%2F%2Fdshopen.org%2Fbadge%2F%2540polunzh%2Fdsh-task-notifier.json)](https://dshopen.org/zh/plugins/@polunzh/dsh-task-notifier/)

@@ -1,6 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- 铃铛：任务完成的通知感；用纯蓝表达「任务面板」这个入口 -->
-  <circle cx="32" cy="32" r="26" fill="#247bbf"/>
-  <path d="M32 17a11 11 0 0 1 11 11v6.4c0 1.6.6 3.1 1.7 4.3l2.1 2.3c.7.8.1 2-1 2H20.2c-1.1 0-1.7-1.2-1-2l2.1-2.3a6.3 6.3 0 0 0 1.7-4.3V28a11 11 0 0 1 11-11Z" fill="#ffffff"/>
-  <path d="M27 45h10a5 5 0 0 1-10 0Z" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Task Notifier">
+  <!--
+    任务通知台：白色铃铛 = 任务完成/中断时的提示；右上琥珀点 = 「待回复」，
+    与侧边栏图标里 needs-input 时的琥珀脉冲点同色（#f59e0b）。
+    底色用面板业务蓝 #4176e6 的渐变，64 网格、2px 安全边距，20px 下仍可辨认。
+  -->
+  <defs>
+    <linearGradient id="dtn-bg" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="64">
+      <stop offset="0" stop-color="#5d8cf0"/>
+      <stop offset="1" stop-color="#3a6ada"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#dtn-bg)"/>
+  <g transform="translate(-1.5,1)" fill="#ffffff">
+    <path d="M32 15.5a10.8 10.8 0 0 1 10.8 10.8v6.4c0 3.5 1.4 6.9 4 9.2 1.6 1.5 2.7 2.5 3.4 3.4.9 1 .2 2.7-1.2 2.7H13c-1.4 0-2.1-1.7-1.2-2.7.7-.9 1.8-1.9 3.4-3.4 2.6-2.3 4-5.7 4-9.2v-6.4A10.8 10.8 0 0 1 32 15.5z"/>
+    <path d="M27.4 46h9.2a4.6 4.6 0 0 1-9.2 0z"/>
+  </g>
+  <circle cx="47" cy="16.5" r="7.6" fill="#f59e0b"/>
 </svg>
