@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { transitionTask } from "../lib/core.js";
 
 /**
  * 通知链路的回归约束。
@@ -14,6 +15,7 @@ import { fileURLToPath } from "node:url";
  *  - 会话级失败只标 changeAt，按 completedAt 过滤时永远漏；
  *  - 浏览器通知构造失败时没有系统通知兜底；
  *  - 所有通知共用一个 tag，连续完成会被系统折叠。
+ *  - 运行中任务的 changeAt 被当成完成时刻，连续提问时开跑瞬间误弹通知。
  */
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -39,8 +41,73 @@ test("去重按「这一次完成」判断，同一会话可以反复提醒", ()
   assert.match(source, /at > state\.watermark && at > \(state\.notifiedAt\.get\(task\.id\) \?\? 0\)/);
 });
 
-test("中断任务没有 completedAt 时退回 changeAt", () => {
-  assert.match(source, /return task\?\.completedAt \|\| task\?\.changeAt \|\| 0;/);
+test("resultAt 只把真正收尾的结果当新完成", () => {
+  // 从浏览器 bundle 里取出 resultAt 直接跑，避免只靠源码正则在措辞上打滑。
+  const match = source.match(/function resultAt\(task\) \{[\s\S]*?\n      \}/);
+  assert.ok(match, "应能找到 resultAt");
+  const resultAt = new Function(`${match[0]}; return resultAt;`)();
+  // 运行中的普通任务：completedAt 被重置为 0，changeAt 只是开跑时刻，不能当结果
+  assert.equal(resultAt({ running: true, completedAt: 0, changeAt: 4000 }), 0);
+  // 正常完成
+  assert.equal(resultAt({ running: false, completedAt: 3000, changeAt: 3000 }), 3000);
+  // 旧版宿主：会话级失败只写 changeAt，但标了 interrupted，仍要能兜底
+  assert.equal(resultAt({ interrupted: true, completedAt: 0, changeAt: 2500 }), 2500);
+  // 当前宿主中断：completedAt 已写，优先用它
+  assert.equal(resultAt({ interrupted: true, completedAt: 2600, changeAt: 2600 }), 2600);
+});
+
+test("连续提问：第二轮开跑不再误报，收尾与会话级失败仍提醒", () => {
+  const match = source.match(/function resultAt\(task\) \{[\s\S]*?\n      \}/);
+  const resultAt = new Function(`${match[0]}; return resultAt;`)();
+
+  const task = {
+    id: "s",
+    running: false,
+    needsInput: false,
+    inputKind: null,
+    startedAt: 0,
+    completedAt: 0,
+    unread: false,
+    changeAt: 0,
+    interrupted: false,
+    interruptedKind: null,
+    interruptedMessage: null,
+  };
+  const notified = new Map();
+  let watermark = 1000;
+  const isFresh = () =>
+    task.unread && resultAt(task) > watermark && resultAt(task) > (notified.get(task.id) ?? 0);
+  const settle = () => {
+    if (!isFresh()) return false;
+    notified.set(task.id, resultAt(task));
+    watermark = Math.max(watermark, resultAt(task));
+    return true;
+  };
+
+  transitionTask(task, true, 2000); // Q1 开跑
+  assert.equal(isFresh(), false, "开跑不是结果");
+  transitionTask(task, false, 3000); // Q1 完成
+  assert.equal(settle(), true, "Q1 完成要提醒");
+  assert.equal(task.unread, true, "用户还没看，上一轮仍是未读");
+
+  transitionTask(task, true, 4000); // 用户接着问 Q2（同一会话、未 markRead）
+  assert.equal(isFresh(), false, "Q2 开跑瞬间不能当成一次新完成");
+
+  transitionTask(task, false, 5000); // Q2 完成
+  assert.equal(settle(), true, "Q2 收尾仍要提醒");
+
+  // 会话级失败：status 可能还没翻成 idle（running 仍为 true），但已标中断并写了 completedAt
+  transitionTask(task, true, 6000);
+  Object.assign(task, { running: true, interrupted: true, completedAt: 6500, changeAt: 6500, unread: true });
+  assert.equal(isFresh(), true, "会话级失败即使 running 未翻转也要提醒");
+});
+
+test("未读角标与「未读结果」列同口径，运行中的任务不计入", () => {
+  assert.match(
+    source,
+    /if \(task\.unread && !task\.running && !task\.needsInput\) count \+= 1;/,
+    "角标要忽略运行中/等人中的任务，否则开跑后角标亮、未读列却是空的",
+  );
 });
 
 test("浏览器通知构造失败要落到宿主系统通知", () => {
