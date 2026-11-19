@@ -152,6 +152,27 @@ test("parseState 校验版本、过滤非法任务、截断标题", () => {
   assert.equal(parsed[0].unread, true);
 });
 
+test("parseState 解析谱系字段并净化非法父 id / 夹紧深度", () => {
+  const parsed = parseState({
+    version: 1,
+    tasks: [
+      { id: "c", completedAt: 1, unread: true, changeAt: 1, parentId: "p", depth: 2, origin: "subagent" },
+      { id: "d", parentId: "", depth: -3 },
+      { id: "e", parentId: "x\u0000", depth: 99 },
+    ],
+  });
+  const c = parsed.find((item) => item.id === "c");
+  assert.equal(c.parentId, "p");
+  assert.equal(c.depth, 2);
+  assert.equal(c.origin, "subagent");
+  const d = parsed.find((item) => item.id === "d");
+  assert.equal(d.parentId, null, "空父 id 归一化为 null");
+  assert.equal(d.depth, 0, "负深度夹到 0");
+  const e = parsed.find((item) => item.id === "e");
+  assert.equal(e.parentId, null, "含控制字符的父 id 被丢弃");
+  assert.equal(e.depth, 8, "超深夹到上限 8");
+});
+
 test("transitionTask 只在状态翻转时推进时间", () => {
   const task = { running: false, startedAt: 0, completedAt: 0, unread: false, changeAt: 0 };
   assert.deepEqual(transitionTask(task, false, 100), { changed: false, completed: false });

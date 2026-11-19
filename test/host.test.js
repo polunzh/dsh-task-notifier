@@ -658,3 +658,80 @@ test("会话级 Agent 失败也会标成中断（含欠费识别）", async () =
   const tasks = (await harness.call()).json.tasks;
   assert.equal(tasks.length, 2, "非法 id 不应造出任务");
 });
+
+test("api-session/added 携带会话头谱系：state 暴露 parentId 与父标题", async () => {
+  const harness = createHarness();
+  const added = harness.handlers.get("api-session/added");
+  added({ id: "sess-parent", title: "重构通知去重逻辑" });
+  added({
+    id: "sess-child",
+    title: "校验 LRU 缓存命中率",
+    header: { id: "sess-child", parentSession: "sess-parent", delegationDepth: 1, origin: "subagent" },
+  });
+  const tasks = (await harness.call()).json.tasks;
+  const child = tasks.find((item) => item.id === "sess-child");
+  assert.ok(child, "子代理应进入任务表");
+  assert.equal(child.parentId, "sess-parent");
+  assert.equal(child.depth, 1);
+  assert.equal(child.origin, "subagent");
+  assert.equal(child.parentTitle, "重构通知去重逻辑", "父标题要一起下发给面板");
+});
+
+test("启动预热从 listSessions 的 header 还原父子关系", async () => {
+  const records = [
+    { header: { id: "sess-p", title: "父会话" }, live: true },
+    { header: { id: "sess-c", parentSession: "sess-p", delegationDepth: 1, origin: "subagent" }, live: true },
+  ];
+  const sessionQuery = {
+    async listSessions() {
+      return records;
+    },
+    async readTitleSnapshots() {
+      return [];
+    },
+  };
+  const harness = createHarness({ sessionQuery });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const child = (await harness.call()).json.tasks.find((item) => item.id === "sess-c");
+  assert.ok(child, "子代理应被预热进任务表");
+  assert.equal(child.parentId, "sess-p");
+  assert.equal(child.depth, 1);
+});
+
+test("session/event 的会话头会补齐已有任务的谱系", async () => {
+  const harness = createHarness();
+  const status = harness.handlers.get("api-session/status");
+  const onEvent = harness.handlers.get("session/event");
+  status("sess-late", true);
+  onEvent(
+    { id: "sess-late", header: { id: "sess-late", parentSession: "sess-root", delegationDepth: 2, origin: "subagent" } },
+    { type: "turn/start", data: { turn: 1 } },
+  );
+  const task = (await harness.call()).json.tasks.find((item) => item.id === "sess-late");
+  assert.equal(task.parentId, "sess-root");
+  assert.equal(task.depth, 2);
+  assert.equal(task.origin, "subagent");
+});
+
+test("父子关系会随未读快照持久化并在重启后还原", async () => {
+  const home = mkdtempSync(join(tmpdir(), "dtn-host-lineage-"));
+  const dir = join(home, "storages", "dsh-task-notifier");
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  writeFileSync(
+    join(dir, "state.json"),
+    JSON.stringify({
+      version: 1,
+      savedAt: 1,
+      tasks: [
+        { id: "sess-p", title: "父会话", completedAt: 5, unread: true, changeAt: 5 },
+        { id: "sess-c", title: "子代理", completedAt: 6, unread: true, changeAt: 6, parentId: "sess-p", depth: 1, origin: "subagent" },
+      ],
+    }),
+  );
+  const harness = createHarness({ home });
+  const child = (await harness.call()).json.tasks.find((item) => item.id === "sess-c");
+  assert.equal(child.parentId, "sess-p");
+  assert.equal(child.depth, 1);
+  assert.equal(child.origin, "subagent");
+  assert.equal(child.parentTitle, "父会话");
+});
