@@ -11,12 +11,15 @@ import {
   normalizeId,
   normalizeIds,
   normalizeLocale,
+  normalizeNotificationEntry,
   notificationScript,
+  parseNotifications,
   parseState,
   requestAdmission,
   routeOf,
   sanitizeText,
   transitionTask,
+  trimNotifications,
 } from "../lib/core.js";
 
 test("sanitizeText 折叠控制字符与空白", () => {
@@ -324,4 +327,53 @@ test("transitionTask 重新开跑时清掉中断标记，收尾时保留", () =>
   transitionTask(task, false, 200);
   assert.equal(task.interrupted, true, "停止时不能把中断标记抹掉");
   assert.equal(task.interruptedKind, "error");
+});
+
+/* ---------------------------- 通知中心 ---------------------------- */
+
+test("normalizeNotificationEntry 净化文本、校验来源与 tone", () => {
+  const entry = normalizeNotificationEntry(
+    {
+      id: "task:s1:100",
+      source: "task",
+      kind: "interrupted",
+      title: "  会话\n标题  ",
+      body: "x".repeat(400),
+      tone: "nonsense",
+      ts: 100,
+      sessionId: "s1",
+      interruptedKind: "quota",
+      interruptedMessage: "余额不足",
+    },
+    999,
+  );
+  assert.equal(entry.title, "会话 标题");
+  assert.equal(entry.tone, "default", "非法 tone 回落 default");
+  assert.equal(entry.ts, 100);
+  assert.equal(entry.sessionId, "s1");
+  assert.equal(entry.interruptedKind, "quota");
+  assert.ok(entry.body.length <= LIMITS.maxBody + 2);
+
+  assert.equal(normalizeNotificationEntry({ id: "x", source: "weird", title: "t" }), null, "未知来源丢弃");
+  assert.equal(normalizeNotificationEntry({ id: "x", source: "task", title: "   " }), null, "空标题丢弃");
+  assert.equal(normalizeNotificationEntry({ source: "task", title: "t" }), null, "缺 id 丢弃");
+});
+
+test("parseNotifications 只接受匹配版本，trimNotifications 未读优先保留", () => {
+  assert.equal(parseNotifications({ version: 999, notifications: [] }), null);
+  const parsed = parseNotifications({
+    version: 1,
+    notifications: [
+      { id: "a", source: "task", title: "A", ts: 1 },
+      { id: "b", source: "plugin", title: "B", ts: 2, read: true },
+    ],
+  });
+  assert.equal(parsed.length, 2);
+  assert.equal(parsed[1].source, "plugin");
+
+  const list = [];
+  for (let i = 0; i < 10; i += 1) list.push({ id: `n${i}`, ts: i, read: i < 6 });
+  const trimmed = trimNotifications(list, 4);
+  assert.equal(trimmed.length, 4);
+  assert.equal(trimmed.filter((item) => !item.read).length, 4, "先保未读");
 });

@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>通知中心 · 设计稿</title>
+<style>
+  /* ===== DSH token 快照（浅色） ===== */
+  :root{
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --mono:"SF Mono","JetBrains Mono",Consolas,Menlo,monospace;
+    --radius-xs:4px; --radius-sm:8px; --radius-md:12px; --radius-lg:16px; --radius-xl:20px;
+    --bg-base:#ffffff; --bg-layer:#ffffff; --bg-module:#f5f6f7; --bg-sidebar:#f9fafb;
+    --label-1:#0f1115; --label-2:#61666b; --label-3:#81858c; --label-cap:#adb2b8;
+    --border-1:#0000000a; --border-2:#0000001a; --border-3:#0000001f;
+    --business:#4176e6; --business-weak:#e4edfd;
+    --success:#22c55e; --success-tint:#e6faed;
+    --error:#ec1313; --error-tint:#fdeaea; --error-ink:#c81e1e;
+    --warn:#f59e0b; --warn-ink:#b56a06; --warn-tint:#fef5e7;
+    --hover:#2631480f; --active:#2631481a; --hover-solid:#f1f3f5;
+    --focus:#4176e6;
+    --shadow-panel:0 0 0 .5px #00000029,0 3px 8px 0 #00000008,0 0 16px 0 #00000005;
+    --shadow-prominent:0 0 0 .5px #00000029,0 8px 24px 0 #00000014,0 0 32px 0 #0000000d;
+  }
+  [data-theme="dark"]{
+    --bg-base:#141619; --bg-layer:#1b1e23; --bg-module:#1f2328; --bg-sidebar:#17191d;
+    --label-1:#e9ebee; --label-2:#a7adb6; --label-3:#7d838c; --label-cap:#5c626b;
+    --border-1:#ffffff10; --border-2:#ffffff1f; --border-3:#ffffff2b;
+    --business:#6f96ec; --business-weak:#1e2a44;
+    --success:#34cf7c; --success-tint:#12281c;
+    --error:#f2555a; --error-tint:#2a1618; --error-ink:#ff8b8e;
+    --warn:#f5a623; --warn-ink:#f3b65a; --warn-tint:#2a2011;
+    --hover:#ffffff12; --active:#ffffff1c; --hover-solid:#252a31;
+    --shadow-panel:0 0 0 .5px #00000066,0 8px 24px 0 #00000066;
+    --shadow-prominent:0 0 0 .5px #00000080,0 12px 40px 0 #00000088;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:var(--font);color:var(--label-1);-webkit-font-smoothing:antialiased;
+    background:radial-gradient(circle at 1px 1px,#00000008 1px,transparent 0) 0 0/22px 22px,var(--bg-module);}
+  [data-theme="dark"] body{background:radial-gradient(circle at 1px 1px,#ffffff08 1px,transparent 0) 0 0/22px 22px,var(--bg-module);}
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+  .ico{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .ico--16{width:16px;height:16px}.ico--20{width:20px;height:20px}.ico--14{width:14px;height:14px}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  /* ================= 铃铛 ================= */
+  .bell{position:relative;width:36px;height:36px;border-radius:8px;display:grid;place-items:center;color:var(--label-2)}
+  .bell:hover{background:var(--hover);color:var(--label-1)}
+  .bell[aria-expanded="true"]{background:var(--active);color:var(--label-1)}
+  .badge{position:absolute;top:1px;right:0px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;
+    background:var(--error);color:#fff;font-size:10.5px;font-weight:600;line-height:16px;text-align:center;
+    box-shadow:0 0 0 2px var(--bg-base)}
+  .badge--soft{background:var(--error-tint);color:var(--error-ink);box-shadow:0 0 0 2px var(--bg-base)}
+
+  /* ================= 面板 ================= */
+  .panel{width:400px;max-height:640px;display:flex;flex-direction:column;background:var(--bg-layer);
+    border-radius:var(--radius-lg);box-shadow:var(--shadow-prominent);border:1px solid var(--border-2);overflow:hidden}
+  .p-head{display:flex;align-items:center;gap:9px;padding:0 12px 0 14px;height:52px;border-bottom:1px solid var(--border-1);flex:none}
+  .p-title{font-size:14px;font-weight:650;letter-spacing:.1px}
+  .p-unread{font-size:11px;font-weight:600;color:var(--business);background:var(--business-weak);padding:1px 7px;border-radius:9px}
+  .p-head .sp{flex:1}
+  .p-act{font-size:12px;color:var(--label-2);padding:5px 8px;border-radius:6px}
+  .p-act:hover{background:var(--hover);color:var(--label-1)}
+  .p-x{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;color:var(--label-3)}
+  .p-x:hover{background:var(--hover);color:var(--label-1)}
+
+  .p-filter{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border-1);flex:none}
+  .seg{display:flex;background:var(--bg-module);border-radius:8px;padding:2px;gap:2px}
+  .seg b{font-weight:500;font-size:12px;color:var(--label-2);padding:4px 10px;border-radius:6px;display:flex;gap:5px;align-items:center}
+  .seg b.on{background:var(--bg-layer);color:var(--label-1);font-weight:600;box-shadow:0 1px 2px #00000014}
+  .seg b .n{font-size:10.5px;color:var(--label-3)}
+  .src{margin-left:auto;font-size:12px;color:var(--label-2);display:flex;align-items:center;gap:5px;padding:4px 8px;border-radius:6px}
+  .src:hover{background:var(--hover);color:var(--label-1)}
+
+  .p-body{overflow:auto;flex:1;padding-bottom:6px}
+  .group{position:sticky;top:0;z-index:1;background:var(--bg-layer);padding:10px 14px 6px;font-size:11px;font-weight:600;
+    color:var(--label-3);letter-spacing:.3px;display:flex;align-items:center;gap:6px}
+  .group .dot{width:6px;height:6px;border-radius:50%;background:var(--warn)}
+  .group.today{color:var(--label-3)}
+
+  .item{display:flex;gap:11px;padding:10px 14px;position:relative;cursor:default;align-items:flex-start}
+  .item:hover{background:var(--hover)}
+  .item .src-ico{width:30px;height:30px;border-radius:8px;flex:none;display:grid;place-items:center;margin-top:1px}
+  .src-task{background:var(--business-weak);color:var(--business)}
+  .src-account{background:var(--warn-tint);color:var(--warn-ink)}
+  .src-plugin{background:var(--bg-module);color:var(--label-2)}
+  .item .unread{position:absolute;left:5px;top:22px;width:5px;height:5px;border-radius:50%;background:var(--business)}
+  .it-main{flex:1;min-width:0}
+  .it-top{display:flex;align-items:center;gap:7px}
+  .it-title{font-size:13px;font-weight:600;color:var(--label-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .it-time{margin-left:auto;font-size:11px;color:var(--label-3);flex:none}
+  .it-body{font-size:12px;color:var(--label-2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .it-tags{display:flex;gap:6px;margin-top:5px}
+  .tg{font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:6px;line-height:16px}
+  .tg.warn{background:var(--warn-tint);color:var(--warn-ink)}
+  .tg.err{background:var(--error-tint);color:var(--error-ink)}
+  .tg.ok{background:var(--success-tint);color:#178a45}
+  [data-theme="dark"] .tg.ok{color:var(--success)}
+  .tg.src{background:var(--bg-module);color:var(--label-2);font-weight:500}
+  .item .open{margin-left:auto;align-self:center;font-size:11.5px;color:var(--business);padding:3px 8px;border-radius:6px;opacity:0;flex:none}
+  .item:hover .open{opacity:1}
+  .item.pinned{background:linear-gradient(90deg,var(--warn-tint),transparent 60%)}
+  .item.pinned .unread{background:var(--warn)}
+
+  .p-foot{flex:none;height:46px;border-top:1px solid var(--border-1);display:flex;align-items:center;gap:4px;padding:0 10px}
+  .p-foot .f{font-size:12px;color:var(--label-2);padding:6px 9px;border-radius:7px;display:flex;align-items:center;gap:6px}
+  .p-foot .f:hover{background:var(--hover);color:var(--label-1)}
+  .p-foot .f.primary{color:var(--business);margin-right:auto}
+
+  /* ================= 假壳 ================= */
+  .shell{position:relative;width:1440px;height:900px;background:var(--bg-base);overflow:hidden;border-radius:10px;box-shadow:0 0 0 1px var(--border-2),0 16px 48px #00000018}
+  .side{position:absolute;left:0;top:0;bottom:0;width:236px;background:var(--bg-sidebar);border-right:1px solid var(--border-1);padding:14px 12px}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:600;font-size:13.5px;padding:4px 6px 14px}
+  .brand .lg{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#4176e6,#22c55e)}
+  .snav{font-size:12.5px;color:var(--label-2);display:flex;flex-direction:column;gap:2px}
+  .snav a{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:7px}
+  .snav a.act{background:var(--hover-solid);color:var(--label-1)}
+  .stitle{font-size:11px;color:var(--label-3);padding:16px 9px 6px;font-weight:600;letter-spacing:.3px}
+  .srow{font-size:12.5px;color:var(--label-2);padding:6px 9px;border-radius:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chathead{position:absolute;left:236px;right:0;top:0;height:52px;border-bottom:1px solid var(--border-1);display:flex;align-items:center;gap:10px;padding:0 14px}
+  .ch-title{font-size:13px;font-weight:600;color:var(--label-1)}
+  .ch-sub{font-size:11.5px;color:var(--label-3)}
+  .utils{margin-left:auto;display:flex;align-items:center;gap:2px}
+  .ubtn{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--label-3)}
+  .ubtn:hover{background:var(--hover);color:var(--label-1)}
+  .chatbody{position:absolute;left:236px;right:0;top:52px;bottom:0;padding:28px;color:var(--label-3);font-size:13px}
+  .bubble{max-width:560px;background:var(--bg-module);border-radius:12px;padding:12px 14px;color:var(--label-2);font-size:13px;margin-bottom:12px}
+  .composer{position:absolute;left:300px;right:120px;bottom:26px;height:64px;border:1px solid var(--border-2);border-radius:14px;display:flex;align-items:center;padding:0 14px;color:var(--label-3);font-size:13px;box-shadow:var(--shadow-panel)}
+  .composer .send{margin-left:auto;width:32px;height:32px;border-radius:50%;background:var(--business);display:grid;place-items:center;color:#fff}
+
+  .panel-anchor{position:absolute;top:52px;right:10px;z-index:20}
+  .bell-floating{position:absolute;top:10px;right:14px;z-index:30;background:var(--bg-base)}
+
+  /* ================= 舞台排版 ================= */
+  .stage{padding:32px;display:flex;flex-direction:column;gap:20px}
+  .cap{font-size:13px;font-weight:600;color:var(--label-1);display:flex;align-items:center;gap:8px}
+  .cap .k{font-size:11px;color:var(--label-3);font-weight:500}
+  .frame{position:relative}
+  .panel-canvas{display:flex;justify-content:center;align-items:flex-start;padding:28px}
+  .center{display:flex;justify-content:center}
+
+  /* 窄屏 sheet */
+  .phone{width:390px;height:844px;border-radius:36px;background:var(--bg-base);overflow:hidden;position:relative;box-shadow:0 0 0 1px var(--border-2),0 20px 50px #00000022}
+  .phone .chathead{left:0;right:0;height:48px;padding:0 10px}
+  .phone .utility{position:absolute;top:6px;right:8px}
+  .sheet{position:absolute;left:0;right:0;top:48px;bottom:0;background:var(--bg-layer);border-radius:16px 16px 0 0;box-shadow:0 -8px 30px #00000018;display:flex;flex-direction:column}
+  .sheet .grab{width:36px;height:4px;border-radius:3px;background:var(--border-3);margin:8px auto 2px}
+  .sheet .panel{width:100%;max-height:none;flex:1;box-shadow:none;border:0;border-radius:0;background:var(--bg-layer)}
+  .phone .p-body{max-height:none}
+</style>
+</head>
+<body>
+<div id="stage" class="stage"></div>
+<script>
+const Q = new URLSearchParams(location.search);
+const lang = Q.get('lang') || 'zh';
+const theme = Q.get('theme') || 'light';
+const view = Q.get('view') || 'board';
+document.documentElement.lang = lang === 'en' ? 'en' : 'zh-CN';
+document.getElementById('stage').setAttribute('data-theme', theme);
+
+const D = {
+  zh: {
+    notify:'通知', allRead:'全部已读', all:'全部', unread:'未读', todo:'待处理',
+    allSrc:'全部来源', needYou:'需要你处理', today:'今天', earlier:'更早',
+    expand:'展开完整任务面板', settings:'通知设置',
+    waitApproval:'等待审批', waited:'已等待 21 秒', task:'任务', account:'账号', plugin:'插件',
+    goHandle:'去处理', open:'打开',
+    items:[
+      {p:1,src:'task',title:'确认是否覆盖线上数据',body:'Agent 在等你批准一个写入操作',time:'21 秒前',tag:['warn','等待审批']},
+      {src:'task',title:'重构通知去重逻辑',body:'已完成，用时 1 分 12 秒',time:'刚刚',tag:['ok','已完成'],unread:1},
+      {src:'task',title:'修复移动端侧栏折叠',body:'轮次中止：额度不足或欠费',time:'12 分钟前',tag:['err','已中断 · 欠费'],unread:1},
+      {src:'account',title:'DeepSeek 服务条款更新',body:'我们更新了服务条款，点击查看变更摘要',time:'2 小时前',tag:['src','账号公告'],unread:1},
+      {src:'plugin',title:'已为当前仓库生成记忆页',body:'Hindsight · 新增 3 个页面，可随时查看',time:'3 小时前',tag:['src','插件：Hindsight'],unread:1},
+      {src:'task',title:'补齐插件市场截图',body:'Harness 退出，轮次未收尾',time:'58 分钟前',tag:['warn','已中断 · 退出']}
+    ]
+  },
+  en: {
+    notify:'Notifications', allRead:'Mark all read', all:'All', unread:'Unread', todo:'Action',
+    allSrc:'All sources', needYou:'Needs you', today:'Today', earlier:'Earlier',
+    expand:'Open full task board', settings:'Preferences',
+    waitApproval:'Waiting approval', waited:'waiting 21s', task:'Task', account:'Account', plugin:'Plugin',
+    goHandle:'Handle', open:'Open',
+    items:[
+      {p:1,src:'task',title:'Confirm overwriting production data',body:'Agent is waiting for you to approve a write',time:'21s ago',tag:['warn','Waiting approval']},
+      {src:'task',title:'Refactor notification dedupe',body:'Done in 1m 12s',time:'just now',tag:['ok','Completed'],unread:1},
+      {src:'task',title:'Fix mobile sidebar collapse',body:'Turn stopped: quota or balance exhausted',time:'12m ago',tag:['err','Interrupted · Quota'],unread:1},
+      {src:'account',title:'DeepSeek Terms of Service update',body:'We updated the terms — see the change summary',time:'2h ago',tag:['src','Account notice'],unread:1},
+      {src:'plugin',title:'Generated memory pages for this repo',body:'Hindsight · 3 new pages, ready to review',time:'3h ago',tag:['src','Plugin: Hindsight'],unread:1},
+      {src:'task',title:'Add plugin marketplace screenshots',body:'Harness exited before the turn finished',time:'58m ago',tag:['warn','Interrupted · Exited']}
+    ]
+  }
+};
+const d = D[lang];
+
+const bellSVG = `<svg class="ico" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>`;
+const icons = {
+  task:`<svg class="ico ico--16" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>`,
+  account:`<svg class="ico ico--16" viewBox="0 0 24 24"><path d="M3 11l16-6v14L3 13z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>`,
+  plugin:`<svg class="ico ico--16" viewBox="0 0 24 24"><path d="M9 3h6v3a2 2 0 1 0 4 0h0V9h3v6h-3a2 2 0 1 0 0 4H9v-4a2 2 0 1 0 0-4H9z"/></svg>`
+};
+
+function badge(n){ return `<span class="badge" aria-label="${n} unread">${n>99?'99+':n}</span>`; }
+
+function bell(expanded, n){
+  return `<button class="bell" aria-expanded="${expanded?'true':'false'}" aria-label="${d.notify}">${bellSVG}${n?badge(n):''}</button>`;
+}
+
+function item(it, idx){
+  const srcCls = 'src-'+it.src;
+  const srcLabel = it.src==='task'?d.task:it.src==='account'?d.account:d.plugin;
+  const tags = (it.tag? [it.tag]:[]).map(([cls,txt])=>{
+    if(cls==='warn') return `<span class="tg warn">${txt}</span>`;
+    if(cls==='err') return `<span class="tg err">${txt}</span>`;
+    if(cls==='ok') return `<span class="tg ok">${txt}</span>`;
+    return `<span class="tg src">${txt}</span>`;
+  }).join('');
+  return `<div class="item ${it.p?'pinned':''}">
+    ${it.unread?'<span class="unread"></span>':''}
+    <div class="src-ico ${srcCls}">${icons[it.src]}</div>
+    <div class="it-main">
+      <div class="it-top"><span class="it-title">${it.title}</span><span class="it-time">${it.time}</span></div>
+      <div class="it-body">${it.body}</div>
+      <div class="it-tags">${tags}</div>
+    </div>
+    ${it.p?`<span class="open" style="opacity:1;color:var(--warn-ink)">${d.goHandle} ›</span>`:`<span class="open">${d.open} ›</span>`}
+  </div>`;
+}
+
+function panel(){
+  const sticky = d.items.filter(i=>i.p);
+  const rest = d.items.filter(i=>!i.p);
+  const today = rest.slice(0,2), earlier = rest.slice(2);
+  const unread = d.items.filter(i=>i.unread).length;
+  return `<div class="panel" role="dialog" aria-label="${d.notify}">
+    <div class="p-head">
+      ${bellSVG.replace('class="ico"','class="ico ico--18"')}
+      <span class="p-title">${d.notify}</span>
+      <span class="p-unread">${unread} ${lang==='en'?'unread':'未读'}</span>
+      <span class="sp"></span>
+      <button class="p-act">${d.allRead}</button>
+      <button class="p-x" aria-label="close"><svg class="ico ico--16" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="p-filter">
+      <div class="seg"><b class="on">${d.all} 6</b><b>${d.unread} ${unread}</b><b>${d.todo} ${sticky.length}</b></div>
+      <button class="src">${d.allSrc} <svg class="ico ico--14" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+    </div>
+    <div class="p-body">
+      <div class="group"><span class="dot"></span>${d.needYou}</div>
+      ${sticky.map(item).join('')}
+      <div class="group today">${d.today}</div>
+      ${today.map(item).join('')}
+      <div class="group">${d.earlier}</div>
+      ${earlier.map(item).join('')}
+    </div>
+    <div class="p-foot">
+      <button class="f primary">${d.expand} <svg class="ico ico--14" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+      <button class="f">${d.settings}</button>
+    </div>
+  </div>`;
+}
+
+function shell(){
+  return `<div class="shell">
+    <aside class="side">
+      <div class="brand"><span class="lg"></span>DeepSeek Harness</div>
+      <div class="snav">
+        <a class="act"><svg class="ico ico--16" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${lang==='en'?'Sessions':'会话'}</a>
+        <a><svg class="ico ico--16" viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>${lang==='en'?'Plugins':'插件'}</a>
+      </div>
+      <div class="stitle">${lang==='en'?'Workspaces':'工作区'}</div>
+      <div class="srow">dsh-task-notifier</div>
+      <div class="srow">dsh-plugins</div>
+      <div class="srow">note</div>
+    </aside>
+    <div class="chathead">
+      <span class="ch-title">${lang==='en'?'Notification refactor':'通知系统重构'}</span>
+      <span class="ch-sub">main</span>
+      <div class="utils">
+        <button class="ubtn" title="split"><svg class="ico ico--16" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg></button>
+        <button class="ubtn" title="panel"><svg class="ico ico--16" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
+        <div class="bell-slot" style="margin-left:2px">${bell(true,5)}</div>
+      </div>
+    </div>
+    <div class="chatbody">
+      <div class="bubble">${lang==='en'?'Let’s consolidate all plugin notifications into one top-right entry.':'把各插件的通知收进右上角一个入口吧。'}</div>
+      <div class="bubble" style="background:transparent;color:var(--label-3)">${lang==='en'?'Working on the notification center…':'正在实现通知中心…'}</div>
+      <div class="composer">${lang==='en'?'Message the agent…':'发消息给 Agent…'}<span class="send"><svg class="ico ico--16" viewBox="0 0 24 24" style="stroke:#fff"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span></div>
+    </div>
+    <div class="panel-anchor">${panel()}</div>
+  </div>`;
+}
+
+function phone(){
+  return `<div class="phone">
+    <div class="chathead" style="padding-right:52px"><span class="ch-title">${lang==='en'?'Notification refactor':'通知系统重构'}</span></div>
+    <div class="utility" style="top:8px;right:10px">${bell(true,5)}</div>
+    <div class="sheet">
+      <div class="grab"></div>
+      ${panel()}
+    </div>
+  </div>`;
+}
+
+function caption(main, key){ return `<div class="cap">${main} <span class="k">${key}</span></div>`; }
+
+let html = '';
+if(view==='panel'){
+  html = `<div class="panel-canvas">${panel()}</div>`;
+} else if(view==='context'){
+  html = shell();
+} else if(view==='narrow'){
+  html = `<div class="center">${phone()}</div>`;
+} else {
+  // board
+  html = `
+    ${caption(lang==='en'?'Global entry in context · bell + panel':'全局入口 · 右上角铃铛 + 通知面板','1440 × 900 · light')}
+    <div class="frame">${shell()}</div>
+    <div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap">
+      <div>
+        ${caption(lang==='en'?'Panel':'通知面板','zh · light')}
+        <div style="background:var(--bg-module);border-radius:14px;padding:20px 16px;box-shadow:inset 0 0 0 1px var(--border-1)">${panel()}</div>
+      </div>
+      <div data-theme="dark">
+        ${caption(lang==='en'?'Panel · dark':'通知面板 · 深色','zh · dark')}
+        <div style="background:#101215;border-radius:14px;padding:20px 16px">${panel()}</div>
+      </div>
+      <div>
+        ${caption(lang==='en'?'Narrow (390px)':'窄屏 sheet','390 × 844 · zh')}
+        ${phone()}
+      </div>
+    </div>`;
+}
+document.getElementById('stage').innerHTML = html;
+
+// board 内 dark 区域需要局部主题变量
+if(view==='board'){
+  document.querySelectorAll('[data-theme="dark"]').forEach(el=>{ /* vars cascade via attribute selector on element */ });
+}
+</script>
+</body>
+</html>

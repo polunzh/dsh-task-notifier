@@ -735,3 +735,111 @@ test("父子关系会随未读快照持久化并在重启后还原", async () =>
   assert.equal(child.origin, "subagent");
   assert.equal(child.parentTitle, "父会话");
 });
+
+/* ---------------------------- 通知中心 ---------------------------- */
+
+test("POST /publish 写入通知，/state 返回，/read 按通知 id 与全部已读", async () => {
+  const harness = createHarness();
+  const published = await harness.call({
+    method: "POST",
+    url: "/task-notifier/api/publish",
+    headers: JSON_HEADERS,
+    body: { id: "plugin:hindsight:1", source: "plugin", sourceLabel: "Hindsight", title: "生成记忆页", body: "3 个页面", tone: "info" },
+  });
+  assert.equal(published.status, 200);
+  assert.equal(published.json.notification.id, "plugin:hindsight:1");
+
+  let state = (await harness.call({ url: "/task-notifier/api/state" })).json;
+  assert.equal(state.notifications.length, 1);
+  assert.equal(state.notifications[0].read, false);
+
+  const read = await harness.call({
+    method: "POST",
+    url: "/task-notifier/api/read",
+    headers: JSON_HEADERS,
+    body: { notificationIds: ["plugin:hindsight:1"] },
+  });
+  assert.equal(read.status, 200);
+  assert.equal(read.json.notifications[0].read, true);
+
+  await harness.call({
+    method: "POST",
+    url: "/task-notifier/api/publish",
+    headers: JSON_HEADERS,
+    body: { id: "plugin:other:2", source: "plugin", title: "另一条" },
+  });
+  const all = await harness.call({ method: "POST", url: "/task-notifier/api/read", headers: JSON_HEADERS, body: { all: true } });
+  assert.equal(all.json.notifications.every((item) => item.read), true);
+});
+
+test("非法通知被 /publish 拒绝（400），不污染列表", async () => {
+  const harness = createHarness();
+  const bad = await harness.call({
+    method: "POST",
+    url: "/task-notifier/api/publish",
+    headers: JSON_HEADERS,
+    body: { id: "x", source: "weird", title: "t" },
+  });
+  assert.equal(bad.status, 400);
+  const state = (await harness.call()).json;
+  assert.equal(state.notifications.length, 0);
+});
+
+test("任务完成会生成一条 task 通知，/read 时同步任务未读", async () => {
+  const harness = createHarness();
+  harness.handlers.get("api-session/added")({ id: "sess-n", title: "通知来源" });
+  harness.handlers.get("api-session/status")("sess-n", true);
+  harness.handlers.get("api-session/status")("sess-n", false);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const state = (await harness.call()).json;
+  const entry = state.notifications.find((item) => item.source === "task");
+  assert.ok(entry, "应有一条 task 通知");
+  assert.equal(entry.title, "通知来源");
+  assert.equal(entry.kind, "completed");
+  const task = state.tasks.find((item) => item.id === "sess-n");
+  assert.equal(task.unread, true);
+
+  await harness.call({
+    method: "POST",
+    url: "/task-notifier/api/read",
+    headers: JSON_HEADERS,
+    body: { notificationIds: [entry.id] },
+  });
+  const after = (await harness.call()).json;
+  assert.equal(after.notifications.find((item) => item.id === entry.id).read, true);
+  assert.equal(after.tasks.find((item) => item.id === "sess-n").unread, false, "通知已读要同步任务");
+});
+
+test("/notify 按通知 id 走强制系统通知（osNotify=off 时不真的发）", async () => {
+  const harness = createHarness({ config: { osNotify: "off" } });
+  await harness.call({
+    method: "POST",
+    url: "/task-notifier/api/publish",
+    headers: JSON_HEADERS,
+    body: { id: "plugin:p:1", source: "plugin", title: "T" },
+  });
+  const response = await harness.call({
+    method: "POST",
+    url: "/task-notifier/api/notify",
+    headers: JSON_HEADERS,
+    body: { ids: ["plugin:p:1"] },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.json.requested, 1);
+  assert.equal(response.json.sent, 0, "osNotify=off 时不应真的弹出");
+});
+
+test("通知快照持久化，重启后仍在", async () => {
+  const home = mkdtempSync(join(tmpdir(), "dtn-host-notif-"));
+  const first = createHarness({ home });
+  await first.call({
+    method: "POST",
+    url: "/task-notifier/api/publish",
+    headers: JSON_HEADERS,
+    body: { id: "plugin:persist:1", source: "plugin", title: "持久化" },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 700));
+  const second = createHarness({ home });
+  const state = (await second.call()).json;
+  assert.ok(state.notifications.some((item) => item.id === "plugin:persist:1"), "重启后应恢复通知");
+});

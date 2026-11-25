@@ -77,8 +77,8 @@ test("字典外没有遗留的硬编码面板文案", () => {
 });
 
 test("浏览器通知正文也走文案表", () => {
-  assert.match(source, /new Notification\(title, \{ body: t\(bodyKey\), tag \}\)/);
-  assert.match(source, /task\.interrupted \? "notify\.interrupted" : "notify\.body"/);
+  assert.match(source, /new Notification\(title, \{ body: body \|\| t\("notify\.body"\), tag \}\)/);
+  assert.match(source, /entry\.kind === "interrupted"/);
   assert.ok(zhKeys.has("notify.body") && zhKeys.has("notify.interrupted"));
 });
 

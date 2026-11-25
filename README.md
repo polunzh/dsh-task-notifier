@@ -12,22 +12,24 @@
 
 ---
 
-> A DeepSeek Harness (DSH) web plugin that **notifies you when a task finishes or is interrupted** and gives you a 3-lane kanban Tasks panel displaying sessions waiting on your input, running, and unread results.
+> A DeepSeek Harness (DSH) web plugin that **notifies you when a task finishes or is interrupted** and puts a **notification center** in the top-right corner of every screen — task results, account notices and notifications from other plugins all land there.
 
 ### What it solves
 
 Long-running DSH sessions finish while you are looking somewhere else. This plugin pushes "done" to where you can see it:
 
+- **Top-right notification center** — a bell visible on every screen (conversation, plugins page, settings) with an unread badge that aggregates all sources; clicking opens one inbox with `All / Unread / Action` and source filters, and **Expand** opens the original 3-lane task board.
+- **Aggregates multiple sources** — this plugin's task events, built-in account notices, and notifications published by other plugins (`ctx.notifications.post()` or `window.dshNotifications`) all converge here; system notifications and the chime fire from one place, so sources never double-notify.
 - **Chime** — when any session's turn ends, the browser synthesizes a short ascending chime (G5→C6); no audio assets needed.
 - **Two notification channels**:
   - Page open and permission granted → browser `Notification`; clicking it jumps back to that session.
   - Page closed or permission not granted → the host raises a macOS system notification (`osascript`). A heartbeat keeps the two channels from double-firing.
-- **Needs-input state** — when an agent asks you a question, waits for a plan review, or waits on an approval, the sidebar icon shows an amber pulsing dot and the panel's **Needs input** lane highlights the session, so you can jump straight to the session blocked on you.
-- **Interruptions stay visible** — a turn cut short by quitting or crashing DSH, by an exhausted quota or balance, or by an execution error keeps an "Interrupted · Exited / Quota / Error" warning card in **Unread**, and the system notification states the reason; sending a new message clears the mark.
-- **Three-lane kanban panel** — a sidebar icon with an unread badge and three simultaneous lanes: **needs input / running / unread**, plus top chip filters for focusing on a single lane, collapsible history for earlier tasks, title search, mark-all-read, chime preview, and test notification.
+- **Needs-input state** — when an agent asks you a question, waits for a plan review, or waits on an approval, the top-right bell badge counts it as **Action** and the panel pins a **Needs you** group, so you can jump straight to the session blocked on you.
+- **Interruptions stay visible** — a turn cut short by quitting or crashing DSH, by an exhausted quota or balance, or by an execution error keeps an "Interrupted · Exited / Quota / Error" warning card in the inbox, and the system notification states the reason; sending a new message clears the mark.
+- **Three-lane board** — reachable from **Expand** at the bottom of the notification panel: **needs input / running / unread** simultaneously, with top chip filters for a single lane, collapsible history, title search, mark-all-read, chime preview and test notification.
 - **Session / subagent task tree** — sessions spawned by AgentTeams or subagents nest under their parent session with a connecting rail; the parent card shows "N subagents · running / done" and can fold them. When a child lands in a different lane, a "from <parent>" breadcrumb keeps the relationship visible across lanes.
 - **Read state follows you** — opening a session from the sidebar marks its completed task read automatically.
-- **Unread survives restarts** — state lives in `$DSH_HOME/storages/dsh-task-notifier/state.json`.
+- **Unread survives restarts** — task and notification snapshots live in `$DSH_HOME/storages/dsh-task-notifier/` (`state.json` + `notifications.json`).
 - **Bilingual UI** — interface and system-notification text follow the host language (zh / en).
 
 ### Install
@@ -85,10 +87,19 @@ Everything is optional. Put it in your profile's `cordis.patch.yml`:
 | `osSound` | `Glass` | A built-in macOS sound name (Glass / Ping / Pop …) |
 | `osTitle` | `DeepSeek Harness` | System notification title |
 
+### Publishing notifications from other plugins
+
+Other plugins can add entries to the same inbox:
+
+- **Client** — when the service is available, `ctx.notifications.post({ id, source: 'plugin', sourceLabel, title, body, tone })`; a zero-dependency fallback is `window.dshNotifications.post(...)`.
+- **Host** — inject `notifications` and call `ctx.notifications.post(entry)`.
+
+`source` is `task | account | plugin`; `id` is the stable dedupe key. Account notices are read through the host account service and only appear in the inbox — they do not raise OS notifications.
+
 ### Privacy and security
 
-- **No network**: no outbound requests, telemetry or remote assets.
-- **No uploads**: session titles are written only to the local `state.json` (directory `0700`, file `0600`).
+- **No new outbound connections**: the plugin itself makes no network requests, telemetry or remote assets; the account-notice source reuses the host's existing account service.
+- **Local only**: task and notification snapshots are written to `$DSH_HOME/storages/dsh-task-notifier/` (`state.json`, `notifications.json`; directory `0700`, files `0600`).
 - **No credential reads**: never touches `~/.dsh/.credentials.yaml`, `.env`, keychain or SSH keys.
 - **Fail-closed routing**: if the host connection guard is unavailable, requests are rejected instead of allowed.
 - **No install-time scripts**: no `preinstall` / `postinstall` / `prepare` in `package.json`.
@@ -113,7 +124,15 @@ If you previously installed a `link:` copy or an older version, **keep only one*
 
 ### Screenshots
 
-| Light | Dark |
+| Notification center (light) | Panel (English) |
+|---|---|
+| ![Notification center](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/docs/design/notification-center/context-zh.png) | ![Panel EN](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/docs/design/notification-center/panel-en.png) |
+
+| Panel (Chinese) | Narrow sheet |
+|---|---|
+| ![Panel ZH](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/docs/design/notification-center/panel-zh.png) | ![Narrow](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/docs/design/notification-center/narrow-zh.png) |
+
+| Light board | Dark board |
 |---|---|
 | ![Light](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-light.png) | ![Dark](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/panel-dark.png) |
 

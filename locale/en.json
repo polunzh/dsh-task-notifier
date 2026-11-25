@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Task Notifier",
-    "description": "Plays a chime and raises a system/browser notification when a task finishes or is interrupted; the Tasks sidebar panel filters tasks awaiting your reply, running and unread results."
+    "description": "A top-right notification center for every screen: aggregates task results, account notices and notifications from other plugins, with a chime and system/browser notifications. Expand it into the 3-lane task board for needs-input, running and unread results."
   }
 }
