@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>通知中心 · v2 设计稿</title>
+<style>
+  /* ===== DSH token 快照（浅色 / 深色） ===== */
+  :root{
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --mono:"SF Mono","JetBrains Mono",Consolas,Menlo,monospace;
+    --bg-base:#fff; --bg-layer:#fff; --bg-module:#f5f6f7; --bg-canvas:#f2f3f5;
+    --label-1:#0f1115; --label-2:#61666b; --label-3:#81858c; --label-4:#adb2b8;
+    --border-1:#0000000a; --border-2:#0000001a; --border-3:#0000001f;
+    --business:#4176e6; --business-weak:#e4edfd;
+    --success:#22c55e; --success-tint:#e6faed;
+    --error:#ec1313; --error-tint:#fdeaea; --error-ink:#c81e1e;
+    --warn:#f59e0b; --warn-ink:#b56a06; --warn-tint:#fef5e7;
+    --hover:#2631480f; --active:#2631481a;
+    --shadow-panel:0 0 0 .5px #00000029,0 3px 8px 0 #00000008,0 0 16px 0 #00000005;
+    --shadow-prominent:0 0 0 .5px #00000029,0 8px 24px 0 #00000014,0 0 32px 0 #0000000d;
+  }
+  [data-theme="dark"]{
+    --bg-base:#141619; --bg-layer:#1b1e23; --bg-module:#1f2328; --bg-canvas:#0f1113;
+    --label-1:#e9ebee; --label-2:#a7adb6; --label-3:#7d838c; --label-4:#5c626b;
+    --border-1:#ffffff10; --border-2:#ffffff1f; --border-3:#ffffff2b;
+    --business:#6f96ec; --business-weak:#1e2a44;
+    --success:#34cf7c; --success-tint:#12281c;
+    --error:#f2555a; --error-tint:#2a1618; --error-ink:#ff8b8e;
+    --warn:#f5a623; --warn-ink:#f3b65a; --warn-tint:#2a2011;
+    --hover:#ffffff12; --active:#ffffff1c;
+    --shadow-panel:0 0 0 .5px #00000066,0 8px 24px 0 #00000066;
+    --shadow-prominent:0 0 0 .5px #00000080,0 12px 40px 0 #00000088;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{color-scheme:light}
+  body{
+    font-family:var(--font);color:var(--label-1);-webkit-font-smoothing:antialiased;
+    background:radial-gradient(circle at 1px 1px,#00000009 1px,transparent 0) 0 0/22px 22px,var(--bg-canvas);
+  }
+  button{font:inherit;color:inherit;background:none;border:0}
+  svg{display:block}
+
+  .page{width:1240px;margin:0 auto;padding:40px 0 56px}
+
+  /* ================= 页头 ================= */
+  .head{display:flex;align-items:flex-end;gap:28px;padding:0 4px 30px;border-bottom:1px solid #00000014}
+  .kicker{font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--business);margin-bottom:8px}
+  h1{font-size:27px;font-weight:650;letter-spacing:-.01em}
+  .lede{margin-top:9px;font-size:13px;line-height:1.65;color:var(--label-2);max-width:640px}
+  .head-meta{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .tagchip{font-size:11px;font-weight:600;color:var(--label-2);background:#fff;border:1px solid #00000014;border-radius:20px;padding:5px 10px;white-space:nowrap}
+
+  /* ================= 对照舞台 ================= */
+  .stage{display:flex;gap:64px;align-items:flex-start;padding:34px 0 8px;position:relative}
+  .shot{display:flex;flex-direction:column;gap:13px;position:relative}
+  .shot-head{display:flex;align-items:center;gap:9px;padding-left:2px}
+  .ver{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--label-3);background:#fff;border:1px solid #00000014;border-radius:5px;padding:2px 6px}
+  .ver--new{color:#fff;background:#0f1115;border-color:#0f1115}
+  .shot-name{font-size:13.5px;font-weight:650}
+  .shot-note{font-size:12px;color:var(--label-3);margin-left:auto;font-variant-numeric:tabular-nums}
+  .arrow{position:absolute;left:436px;top:300px;color:#c3c8cf}
+
+  /* ================= 面板 ================= */
+  .nc{
+    width:400px;height:640px;display:flex;flex-direction:column;overflow:hidden;
+    background:var(--bg-layer);border:1px solid var(--border-2);border-radius:16px;
+    box-shadow:var(--shadow-prominent);position:relative;
+  }
+  .nc-head{flex:none;height:56px;display:flex;align-items:center;gap:8px;padding:0 10px 0 14px;border-bottom:1px solid var(--border-1)}
+  .nc-bell{color:var(--label-1)}
+  .nc-title{font-size:14px;font-weight:600;letter-spacing:.01em}
+  .nc-chip{font-size:11px;font-weight:600;color:var(--business);background:var(--business-weak);border-radius:9px;padding:1px 7px;line-height:15px}
+  .nc-sp{flex:1}
+  .nc-act{height:32px;display:inline-flex;align-items:center;padding:0 10px;border-radius:8px;font-size:12px;color:var(--label-2)}
+  .nc-act:hover{background:var(--hover);color:var(--label-1)}
+  .nc-x{width:32px;height:32px;display:grid;place-items:center;border-radius:8px;color:var(--label-3)}
+  .nc-x:hover{background:var(--hover);color:var(--label-1)}
+
+  .nc-filter{flex:none;display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border-1)}
+  .nc-seg{display:flex;gap:2px;padding:2px;border-radius:9px;background:var(--bg-module)}
+  .nc-seg b{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:400;color:var(--label-2);padding:5px 11px;border-radius:7px;cursor:default}
+  .nc-seg b.on{background:var(--bg-layer);color:var(--label-1);font-weight:600;box-shadow:0 1px 2px #00000014}
+  .nc-seg b i{font-style:normal;font-size:10.5px;font-weight:600;color:var(--business)}
+  .nc-src{margin-left:auto;font-size:12px;color:var(--label-2);padding:5px 22px 5px 8px;border-radius:7px;
+    background:transparent url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2381858c' stroke-width='2' stroke-linecap='round'><path d='m6 9 6 6 6-6'/></svg>") no-repeat right 6px center;border:0}
+
+  /* 新筛选：漏斗 */
+  .nc-funnel{width:28px;height:28px;margin-left:auto;display:grid;place-items:center;border-radius:7px;color:var(--label-3);position:relative}
+  .nc-funnel:hover{background:var(--hover);color:var(--label-1)}
+  .nc-funnel.on{color:var(--business);background:var(--business-weak)}
+  .menu{position:absolute;top:36px;right:0;width:142px;padding:4px;border-radius:10px;background:var(--bg-layer);
+    box-shadow:0 0 0 .5px #0000001f,0 8px 24px #00000017;z-index:3}
+  .menu b{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:400;color:var(--label-1);padding:6px 8px;border-radius:6px}
+  .menu b:hover{background:var(--hover)}
+  .menu b svg{color:var(--label-3);opacity:0}
+  .menu b.on svg{opacity:1;color:var(--business)}
+
+  .nc-body{flex:1;overflow:hidden;padding-bottom:4px;position:relative}
+  .nc-body--fade::after{content:"";position:absolute;left:0;right:0;bottom:0;height:34px;background:linear-gradient(to bottom,transparent,var(--bg-layer));pointer-events:none}
+  .nc-group{display:flex;align-items:center;gap:6px;padding:10px 16px 5px;font-size:11px;font-weight:600;letter-spacing:.3px;color:var(--label-3)}
+  .nc-group i{width:6px;height:6px;border-radius:50%;background:var(--warn)}
+
+  /* ================= 旧行（现状） ================= */
+  .old{display:flex;align-items:flex-start;gap:10px;padding:11px 16px;position:relative;cursor:pointer}
+  .old + .old{box-shadow:inset 0 1px 0 var(--border-1)}
+  .old.is-unread{background:color-mix(in srgb,var(--business) 5%,transparent)}
+  .old-rail{width:3px;height:16px;flex:none;margin-top:3px;border-radius:2px;background:var(--label-3)}
+  .old-rail.ok{background:var(--success)}
+  .old-rail.warn{background:var(--warn)}
+  .old-main{flex:1;min-width:0}
+  .old-top{display:flex;align-items:center;gap:8px}
+  .old-dot{width:6px;height:6px;flex:none;border-radius:50%;background:var(--business)}
+  .old-title{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .old-time{margin-left:auto;flex:none;font-size:11px;color:var(--label-3)}
+  .old-body{margin-top:2px;font-size:12px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .old-tags{display:flex;gap:6px;margin-top:5px}
+  .old-tag{font-size:10.5px;font-weight:600;line-height:16px;padding:1px 7px;border-radius:6px;color:var(--label-2);background:var(--bg-module)}
+  .old-tag.warn{color:var(--warn-ink);background:var(--warn-tint)}
+  .old-open{flex:none;align-self:center;font-size:11.5px;color:var(--business);padding:3px 6px;border-radius:6px;opacity:0}
+  .old:hover .old-open,.old[data-hover] .old-open{opacity:1}
+
+  /* ================= 新行 ================= */
+  .r{display:flex;gap:12px;padding:10px 14px;cursor:pointer;position:relative}
+  .r + .r::before{content:"";position:absolute;left:54px;right:14px;top:0;height:1px;background:var(--border-1)}
+  .r:hover{background:var(--hover)}
+  .r.unread{background:color-mix(in srgb,var(--business) 4%,transparent)}
+  .tile{width:28px;height:28px;flex:none;border-radius:8px;position:relative;display:grid;place-items:center;margin-top:1px}
+  .tile-task{background:linear-gradient(140deg,#5b8bf5,#2f57c4);color:#fff}
+  .tile-account{background:var(--bg-module);color:var(--label-2)}
+  .tile-plugin{background:transparent}
+  .tile-plugin svg{width:28px;height:28px}
+  .tile-fallback{background:var(--bg-module);color:var(--label-3)}
+  .udot{position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:var(--business);box-shadow:0 0 0 2px var(--bg-layer)}
+  .badge{position:absolute;right:-3px;bottom:-3px;width:12px;height:12px;border-radius:50%;display:grid;place-items:center;color:#fff;box-shadow:0 0 0 1.5px var(--bg-layer)}
+  .badge-warn{background:var(--warn)}
+  .badge-err{background:var(--error)}
+  .r-main{flex:1;min-width:0}
+  .r-line{display:flex;align-items:center;gap:8px;min-height:17px}
+  .r-title{font-size:13.5px;font-weight:500;color:var(--label-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .r.unread .r-title{font-weight:600}
+  .r-time{margin-left:auto;flex:none;font-size:11px;color:var(--label-3);font-variant-numeric:tabular-nums}
+  .r-meta{margin-top:2px;font-size:12px;line-height:17px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .r-meta.warn{color:var(--warn-ink)}
+  .r-meta.err{color:var(--error-ink)}
+  .nc-foot{flex:none;padding:10px 12px;border-top:1px solid var(--border-1)}
+  .nc-cta{width:100%;height:36px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:9px;
+    background:var(--bg-module);color:var(--label-1);font-size:12.5px;font-weight:600}
+  .nc-cta svg{color:var(--label-3)}
+
+  /* ================= 标注 ================= */
+  .mark{position:absolute;width:20px;height:20px;border-radius:50%;background:#e11d48;color:#fff;
+    font-size:11px;font-weight:700;line-height:20px;text-align:center;box-shadow:0 0 0 3px var(--bg-canvas);z-index:5}
+  .marks{margin-top:26px;display:grid;grid-template-columns:1fr 1fr;gap:10px 40px;padding:0 4px}
+  .marks div{display:flex;gap:10px;font-size:12.5px;line-height:1.6;color:var(--label-2)}
+  .marks b{flex:none;width:20px;height:20px;border-radius:50%;background:#e11d48;color:#fff;font-size:11px;line-height:20px;text-align:center;margin-top:1px}
+
+  /* ================= 卡片区 ================= */
+  .grid{display:flex;gap:28px;align-items:flex-start;margin-top:46px}
+  .card{background:var(--bg-layer);border:1px solid var(--border-2);border-radius:16px;box-shadow:var(--shadow-panel);padding:18px}
+  .card-h{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+  .card-h h2{font-size:13.5px;font-weight:650}
+  .card-h span{font-size:11.5px;color:var(--label-3)}
+  .card--rows{width:452px}
+  .card--tiles{width:352px}
+  .card--menu{width:404px}
+
+  .rowcase{display:flex;flex-direction:column;gap:0;border:1px solid var(--border-1);border-radius:11px;overflow:hidden}
+  .case{position:relative;padding-bottom:7px}
+  .case + .case{border-top:1px solid var(--border-1)}
+  .case b{display:block;padding:0 14px 0 54px;font-size:10.5px;font-weight:500;color:var(--label-4);letter-spacing:.01em}
+
+  .tiles{display:flex;gap:22px;padding:6px 2px 2px}
+  .tiles figure{display:flex;flex-direction:column;align-items:center;gap:8px;width:68px}
+  .tiles figure span{font-size:10.5px;color:var(--label-3);text-align:center;line-height:1.35}
+  .tile--lg{width:40px;height:40px;border-radius:11px;margin:0}
+  .tile--lg svg.big{width:40px;height:40px}
+
+  .spec{margin-top:16px;border-top:1px solid var(--border-1);padding-top:12px;display:grid;grid-template-columns:86px 1fr;gap:7px 14px;font-size:11.5px}
+  .spec dt{color:var(--label-3)}
+  .spec dd{color:var(--label-1);font-variant-numeric:tabular-nums}
+  .spec dd code{font-family:var(--mono);font-size:11px;background:var(--bg-module);border-radius:4px;padding:1px 5px}
+
+  /* ================= 深色 ================= */
+  .dark-block{display:flex;gap:40px;align-items:flex-start;margin-top:46px}
+  .dark-copy{width:420px;padding-top:8px}
+  .dark-copy h2{font-size:15px;font-weight:650;margin-bottom:10px}
+  .dark-copy p{font-size:12.5px;line-height:1.7;color:var(--label-2);margin-bottom:10px}
+  .dark-copy ul{list-style:none;display:flex;flex-direction:column;gap:7px;font-size:12.5px;color:var(--label-2)}
+  .dark-copy li{display:flex;gap:8px}
+  .dark-copy li::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--label-4);margin-top:7px;flex:none}
+
+  .foot{margin-top:44px;padding-top:16px;border-top:1px solid #00000014;font-size:11.5px;color:var(--label-3);display:flex;gap:18px}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="head">
+    <div>
+      <div class="kicker">dsh-task-notifier · 通知中心</div>
+      <h1>视觉改版 v2：应用图标与降噪</h1>
+      <p class="lede">同一批真实事件（2026-11-25 16:50，10 条通知）在现状与改版后的样子。改版做三件事：把来源交给图标、把重复的完成事件合成一行、把每行压到 44–62px。</p>
+    </div>
+    <div class="head-meta">
+      <span class="tagchip">面板 400 × 640</span>
+      <span class="tagchip">浅色 / 深色</span>
+      <span class="tagchip">目标版本 1.4.11</span>
+    </div>
+  </header>
+
+  <section class="stage" id="stage">
+    <figure class="shot" id="shot-before"></figure>
+    <div class="arrow" aria-hidden="true">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15"/><path d="m13 6 6 6-6 6"/></svg>
+    </div>
+    <figure class="shot" id="shot-after"></figure>
+  </section>
+
+  <section class="marks">
+    <div><b>1</b><span>同一会话每完成一轮就多一行：10 条里 5 条是重复，面板读起来像日志。</span></div>
+    <div><b>2</b><span>来源只能靠「插件：dsh-todo」文字 chip，多占一行，行高 76px，一屏 8 条。</span></div>
+    <div><b>3</b><span>色条 + 未读圆点 + 浅底 + 加粗 + hover「打开」，五个信号抢同一件事。</span></div>
+    <div><b>4</b><span>来源筛选是未美化的原生 select，视觉重量和分段控件相当。</span></div>
+    <div><b>5</b><span>头部挤了「任务面板 / 全部已读 / 关闭」三个动作，入口和操作等权。</span></div>
+  </section>
+
+  <section class="grid">
+    <div class="card card--rows">
+      <div class="card-h"><h2>行状态</h2><span>改版后只有五种行</span></div>
+      <div class="rowcase" id="rowcases"></div>
+    </div>
+
+    <div class="card card--tiles">
+      <div class="card-h"><h2>应用瓦片</h2><span>28px，圆角 8</span></div>
+      <div class="tiles" id="tiles"></div>
+      <dl class="spec">
+        <dt>任务</dt><dd>渐变 <code>#5b8bf5 → #2f57c4</code> + 白色星芒</dd>
+        <dt>账号</dt><dd><code>bg-module</code> 底 + 喇叭</dd>
+        <dt>插件</dt><dd>插件自己的 <code>icon</code>（data URL）</dd>
+        <dt>降级</dt><dd>灰底拼图，不出现破图</dd>
+      </dl>
+    </div>
+
+    <div class="card card--menu">
+      <div class="card-h"><h2>来源筛选</h2><span>28px 漏斗 + 菜单</span></div>
+      <div style="position:relative;border:1px solid var(--border-1);border-radius:11px;overflow:visible">
+        <div class="nc-filter" style="border-bottom:0">
+          <div class="nc-seg"><b class="on">全部</b><b>未读 <i>1</i></b><b>待处理</b></div>
+          <button class="nc-funnel on" id="funnelBtn"></button>
+        </div>
+        <div style="height:96px;background:var(--bg-layer)"></div>
+      </div>
+      <p style="margin-top:12px;font-size:11.5px;line-height:1.6;color:var(--label-3)">菜单四项，选中打勾；计数只在大于 0 时出现（「全部 23」不再显示）。</p>
+    </div>
+  </section>
+
+  <section class="dark-block">
+    <figure class="shot" id="shot-dark" data-theme="dark"></figure>
+    <div class="dark-copy" data-theme="light">
+      <h2>深色与窄屏</h2>
+      <p>深色下瓦片底色换成 <code>bg-module</code>，徽标与未读点的描边取面板底色，插件图标本身自带底色所以不变。</p>
+      <ul>
+        <li>窄于 640px 时面板变全宽 sheet，行结构与图标不变。</li>
+        <li>合并条目只在副行写「完成 5 次」，单次结果不写。</li>
+        <li>中断行才有琥珀/红徽标；完成是常态，不额外上色。</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>设计稿：docs/design/notification-center-v2/index.html</span>
+    <span>配套：docs/notification-center-visual-refresh-design.md</span>
+  </footer>
+</main>
+
+<script>
+/* ---------- 图标 ---------- */
+const ico = (paths, size = 16, sw = 1.6) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+const I = {
+  bell: ico('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>', 16),
+  list: ico('<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>', 15),
+  close: ico('<path d="M6 6l12 12M18 6 6 18"/>', 15),
+  chevron: ico('<path d="m9 6 6 6-6 6"/>', 14),
+  megaphone: ico('<path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1Z"/><path d="M15 8a4 4 0 0 1 0 8"/>', 15),
+  puzzle: ico('<path d="M9 3h6v3a2 2 0 1 0 4 0V9h3v6h-3a2 2 0 1 0 0 4H9v-4a2 2 0 1 0 0-4H9Z"/>', 15),
+  check: ico('<path d="m20 6-11 11-4-4"/>', 9),
+  alert: ico('<path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9.5v4"/><path d="M12 17h.01"/>', 8, 2.2),
+  funnel: ico('<path d="M3.5 5h17l-6.6 7.7v5.5l-3.8 2v-7.5Z"/>', 15),
+  spark: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6c.4 3.6 1.9 5.9 5.4 7.1l2.2.7-2.2.7c-3.5 1.2-5 3.5-5.4 7.1-.4-3.6-1.9-5.9-5.4-7.1l-2.2-.7 2.2-.7c3.5-1.2 5-3.5 5.4-7.1Z"/><path d="M19.4 15.4c.2 1.5.8 2.4 2.2 2.9-1.4.5-2 1.4-2.2 2.9-.2-1.5-.8-2.4-2.2-2.9 1.4-.5 2-1.4 2.2-2.9Z" opacity=".85"/></svg>',
+};
+/* dsh-todo 的真实图标（gradient + 白色对勾），原样缩小到 28px */
+const todoIcon = `<svg viewBox="0 0 256 256" aria-hidden="true"><defs><linearGradient id="dshTodo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7f79ff"/><stop offset="1" stop-color="#4b45cf"/></linearGradient></defs><rect x="0" y="0" width="256" height="256" rx="64" fill="url(#dshTodo)"/><path d="M64 138 L100 174 L188 86" fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+const tile = {
+  task: `<span class="tile tile-task">${I.spark}</span>`,
+  account: `<span class="tile tile-account">${I.megaphone}</span>`,
+  plugin: `<span class="tile tile-plugin">${todoIcon}</span>`,
+  fallback: `<span class="tile tile-fallback">${I.puzzle}</span>`,
+};
+
+/* ---------- 数据：改版前（= 用户截图里的事件流） ---------- */
+const before = [
+  { kind: 'plugin', title: '休息结束', body: '回来继续专注吧。', chip: '插件：dsh-todo', time: '刚刚', unread: true, hover: true },
+  { kind: 'task', tone: 'ok', title: 'Mnemon idle checkpoint review', time: '7 分钟前' },
+  { kind: 'task', tone: 'ok', title: '右上角全局通知中心设计', time: '9 分钟前' },
+  { kind: 'task', tone: 'ok', title: '右上角全局通知中心设计', time: '11 分钟前' },
+  { kind: 'task', tone: 'warn', title: 'Mnemon idle checkpoint review', chip: '已中断 · 退出', warn: true, time: '12 分钟前' },
+  { kind: 'task', tone: 'ok', title: '番茄钟提醒接入通知中心', time: '14 分钟前' },
+  { kind: 'task', tone: 'ok', title: '右上角全局通知中心设计', time: '15 分钟前' },
+  { kind: 'task', tone: 'ok', title: '右上角全局通知中心设计', time: '18 分钟前' },
+  { kind: 'task', tone: 'ok', title: 'Mnemon idle checkpoint review', time: '19 分钟前' },
+  { kind: 'task', tone: 'ok', title: '右上角全局通知中心设计', time: '19 分钟前' },
+];
+
+/* ---------- 数据：改版后（同一批事件，按会话+结果合并） ---------- */
+const after = [
+  { group: '今天' },
+  { kind: 'plugin', title: '休息结束', meta: '回来继续专注吧。', time: '刚刚', unread: true },
+  { kind: 'task', title: 'Mnemon idle checkpoint review', meta: '完成 2 次', time: '7 分钟前' },
+  { kind: 'task', title: '右上角全局通知中心设计', meta: '完成 5 次', time: '9 分钟前' },
+  { kind: 'account', title: 'DeepSeek 账号', meta: '本月额度已重置，新的用量周期从现在开始。', time: '10 分钟前' },
+  { kind: 'task', title: 'Mnemon idle checkpoint review', meta: '已中断 · 退出', metaTone: 'warn', badge: 'warn', time: '12 分钟前' },
+  { kind: 'task', title: '番茄钟提醒接入通知中心', time: '14 分钟前' },
+  { kind: 'task', title: '审查通知中心合并策略', time: '16 分钟前' },
+];
+
+/* ---------- 旧面板 ---------- */
+function oldRow(d) {
+  return `<div class="old${d.unread ? ' is-unread' : ''}"${d.hover ? ' data-hover="1"' : ''}>
+    <span class="old-rail ${d.tone || ''}"></span>
+    <div class="old-main">
+      <div class="old-top">${d.unread ? '<span class="old-dot"></span>' : ''}<span class="old-title">${d.title}</span><span class="old-time">${d.time}</span></div>
+      ${d.body ? `<div class="old-body">${d.body}</div>` : ''}
+      ${d.chip ? `<div class="old-tags"><span class="old-tag${d.warn ? ' warn' : ''}">${d.chip}</span></div>` : ''}
+    </div>
+    <span class="old-open">打开 ›</span>
+  </div>`;
+}
+
+function oldPanel() {
+  return `<div class="nc">
+    <div class="nc-head">
+      <span class="nc-bell">${I.bell}</span>
+      <span class="nc-title">通知</span>
+      <span class="nc-chip">1 未读</span>
+      <span class="nc-sp"></span>
+      <button class="nc-act" style="display:inline-flex;align-items:center;gap:6px">${I.list}<span>任务面板</span></button>
+      <button class="nc-act">全部已读</button>
+      <button class="nc-x">${I.close}</button>
+    </div>
+    <div class="nc-filter">
+      <div class="nc-seg"><b class="on">全部 <i style="color:var(--label-3)">23</i></b><b>未读 <i style="color:var(--label-3)">1</i></b><b>待处理 <i style="color:var(--label-3)">0</i></b></div>
+      <select class="nc-src"><option>全部来源</option></select>
+    </div>
+    <div class="nc-body nc-body--fade">
+      <div class="nc-group">今天</div>
+      ${before.map(oldRow).join('')}
+    </div>
+  </div>`;
+}
+
+/* ---------- 新面板 ---------- */
+function newRow(d) {
+  const badge = d.badge ? `<span class="badge badge-${d.badge}">${I.alert}</span>` : '';
+  const dot = d.unread ? '<span class="udot"></span>' : '';
+  const t = tile[d.kind] || tile.task;
+  return `<div class="r${d.unread ? ' unread' : ''}">
+    ${t === tile.plugin || t === tile.task || t === tile.account ? t.replace('</span>', badge + dot + '</span>') : t}
+    <div class="r-main">
+      <div class="r-line"><span class="r-title">${d.title}</span><span class="r-time">${d.time}</span></div>
+      ${d.meta ? `<div class="r-meta${d.metaTone ? ' ' + d.metaTone : ''}">${d.meta}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+function newPanel() {
+  const body = after.map((d) => d.group ? `<div class="nc-group">${d.group}</div>` : newRow(d)).join('');
+  return `<div class="nc">
+    <div class="nc-head">
+      <span class="nc-bell">${I.bell}</span>
+      <span class="nc-title">通知</span>
+      <span class="nc-chip">1 未读</span>
+      <span class="nc-sp"></span>
+      <button class="nc-act">全部已读</button>
+      <button class="nc-x">${I.close}</button>
+    </div>
+    <div class="nc-filter">
+      <div class="nc-seg"><b class="on">全部</b><b>未读 <i>1</i></b><b>待处理</b></div>
+      <button class="nc-funnel">${I.funnel}</button>
+    </div>
+    <div class="nc-body">${body}</div>
+    <div class="nc-foot"><button class="nc-cta">${I.list}<span>打开任务面板</span>${I.chevron}</button></div>
+  </div>`;
+}
+
+/* ---------- 组装对照 ---------- */
+const shotBefore = document.getElementById('shot-before');
+shotBefore.innerHTML = `
+  <div class="shot-head"><span class="ver">v1.4.10</span><span class="shot-name">现状</span><span class="shot-note">10 行 · 一屏 8 条</span></div>
+  ${oldPanel()}
+  <span class="mark" style="left:-11px;top:26px">5</span>
+  <span class="mark" style="left:-11px;top:250px">3</span>
+  <span class="mark" style="right:-11px;top:104px">4</span>
+  <span class="mark" style="right:-11px;top:330px">1</span>
+  <span class="mark" style="right:-11px;top:196px">2</span>
+`;
+
+const shotAfter = document.getElementById('shot-after');
+shotAfter.innerHTML = `
+  <div class="shot-head"><span class="ver ver--new">v1.4.11</span><span class="shot-name">改版</span><span class="shot-note">7 行 · 10 条事件并成 5 行</span></div>
+  ${newPanel()}
+`;
+
+/* ---------- 行状态 ---------- */
+const cases = [
+  { d: { kind: 'plugin', title: '休息结束', meta: '回来继续专注吧。', time: '刚刚', unread: true }, note: '未读插件行 · 浅底 + 瓦片右上点 + 加粗标题' },
+  { d: { kind: 'task', title: '番茄钟提醒接入通知中心', time: '14 分钟前' }, note: '已读完成行 · 44px，一个信号都不多' },
+  { d: { kind: 'task', title: '右上角全局通知中心设计', meta: '完成 5 次', time: '9 分钟前' }, note: '合并计数 · 副行「完成 5 次」' },
+  { d: { kind: 'task', title: 'Mnemon idle checkpoint review', meta: '已中断 · 退出', metaTone: 'warn', badge: 'warn', time: '12 分钟前' }, note: '中断行 · 琥珀徽标 + 结果文案' },
+  { d: { kind: 'account', title: 'DeepSeek 账号', meta: '本月额度已重置，新的用量周期从现在开始。', time: '10 分钟前' }, note: '账号行 · 灰瓦片 + 正文' },
+];
+document.getElementById('rowcases').innerHTML = cases.map((c) => `<div class="case">${newRow(c.d)}<b>${c.note}</b></div>`).join('');
+
+/* ---------- 瓦片 ---------- */
+document.getElementById('tiles').innerHTML = [
+  ['task', '任务结果'],
+  ['account', '账号通知'],
+  ['plugin', '插件 · dsh-todo'],
+  ['fallback', '降级 · 拼图'],
+].map(([k, label]) => `<figure>${tile[k].replace('class="tile ', 'class="tile tile--lg ').replace('<svg viewBox="0 0 256 256"', '<svg class="big" viewBox="0 0 256 256"')}<span>${label}</span></figure>`).join('');
+
+/* ---------- 来源菜单 ---------- */
+document.getElementById('funnelBtn').innerHTML = I.funnel;
+document.getElementById('funnelBtn').insertAdjacentHTML('afterend', `<div class="menu">
+  ${[['全部来源', 1], ['任务', 0], ['账号', 0], ['插件', 0]].map(([label, on]) => `<b class="${on ? 'on' : ''}">${I.check}${label}</b>`).join('')}
+</div>`);
+
+/* ---------- 深色 ---------- */
+const shotDark = document.getElementById('shot-dark');
+shotDark.innerHTML = `
+  <div class="shot-head"><span class="ver">dark</span><span class="shot-name">深色</span><span class="shot-note">同一套规格</span></div>
+  ${newPanel()}
+`;
+</script>
+</body>
+</html>
