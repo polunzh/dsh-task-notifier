@@ -7,17 +7,19 @@ import { fileURLToPath } from "node:url";
 /**
  * 入口与图标的约束。
  *
- * 1.4.1 起：右上角铃铛（shell.overlay）是通知中心入口，同时保留侧边栏「任务面板」
- * 入口（sidebar.panellist + main），两者共用同一个 store。
+ * 1.4.3 起：铃铛注册在会话头顶栏 utilities，紧挨「更多（…）」左侧；
+ * 侧边栏「任务面板」入口（sidebar.panellist + main）保留，两者共用同一个 store。
  */
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const source = readFileSync(join(root, "lib", "client.js"), "utf8");
 
-test("铃铛注册在 shell.overlay，跨所有主面板常驻", () => {
-  assert.match(source, /ctx\.slots\.inject\("shell\.overlay"/);
-  assert.match(source, /name: "shell\.overlay"/);
-  assert.match(source, /id: "task-notifier-center"/);
+test("铃铛注册在会话头顶栏 utilities，排在「更多」之前", () => {
+  assert.match(source, /ctx\.slots\.inject\("conversation\.session\.header\.utilities"/);
+  assert.match(source, /name: "conversation\.session\.header\.utilities"/);
+  assert.match(source, /id: "task-notifier-bell"/);
+  assert.match(source, /order: 100/);
+  assert.equal(source.includes('"shell.overlay"'), false, "不要再在全局浮层放第二个入口");
 });
 
 test("保留侧边栏任务面板入口与主面板", () => {

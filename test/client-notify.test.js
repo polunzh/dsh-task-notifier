@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
  *  - 新结果按通知 id + 时间水位线去重，同一会话多次完成仍会提醒；
  *  - 浏览器通知弹不出来时按通知 id 落到宿主系统通知；
  *  - 通知 tag 按会话/通知区分；
- *  - 铃铛是唯一入口（shell.overlay），不再挂侧边栏。
+ *  - 铃铛在会话头顶栏 utilities（紧挨「更多」），侧边栏任务面板入口保留。
  */
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -59,10 +59,10 @@ test("通知 tag 按会话（或通知 id）区分，避免连续完成被系统
   assert.doesNotMatch(source, /tag: NS \}/, "所有通知共用一个 tag 会互相替换");
 });
 
-test("入口：通知中心在 shell.overlay，任务面板保留在侧边栏", () => {
+test("入口：铃铛在会话头顶栏 utilities，任务面板保留在侧边栏", () => {
   assert.match(source, /function NotificationCenterRoot\(/, "应有通知中心组件");
-  assert.match(source, /ctx\.slots\.inject\("shell\.overlay"/, "铃铛注册在 shell.overlay");
-  assert.match(source, /id: "task-notifier-center"/);
+  assert.match(source, /ctx\.slots\.inject\("conversation\.session\.header\.utilities"/, "铃铛注册在会话头顶栏");
+  assert.match(source, /id: "task-notifier-bell"/);
   assert.match(source, /ctx\.slots\.inject\("sidebar\.panellist"/, "保留侧边栏任务面板入口");
   assert.equal(source.includes("PanelIcon("), false, "旧侧栏图标已替换为 TaskSidebarIcon");
 });
