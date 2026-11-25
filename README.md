@@ -18,7 +18,7 @@
 
 Long-running DSH sessions finish while you are looking somewhere else. This plugin pushes "done" to where you can see it:
 
-- **Top-right notification center** — a bell visible on every screen (conversation, plugins page, settings) with an unread badge that aggregates all sources; clicking opens one inbox with `All / Unread / Action` and source filters, and **Expand** opens the original 3-lane task board.
+- **Top-right notification center** — a bell visible on every screen (conversation, plugins page, settings) with an unread badge that aggregates all sources; clicking opens one inbox with `All / Unread / Action` and source filters, and **Open task panel** at the bottom reaches the original 3-lane board. Each row leads with the source's app icon — plugin notices show that plugin's own icon, task and account notices use built-in tiles; repeated completions of one session collapse into a single row with "Completed N×", and the unread badge no longer multiplies per turn.
 - **Aggregates multiple sources** — this plugin's task events, built-in account notices, and notifications published by other plugins (`ctx.notifications.post()` or `window.dshNotifications`) all converge here; system notifications and the chime fire from one place, so sources never double-notify.
 - **Chime** — when any session's turn ends, the browser synthesizes a short ascending chime (G5→C6); no audio assets needed.
 - **Two notification channels**:
@@ -124,13 +124,13 @@ If you previously installed a `link:` copy or an older version, **keep only one*
 
 ### Screenshots
 
-| Notification center (light) | Panel (English) |
+| Notification center (light) | Notification center (dark) |
 |---|---|
-| ![Notification center](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/docs/design/notification-center/context-zh.png) | ![Panel EN](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/docs/design/notification-center/panel-en.png) |
+| ![Notification center light](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/center-light.png) | ![Notification center dark](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/center-dark.png) |
 
-| Panel (Chinese) | Narrow sheet |
+| Notification center (English) | Design sheet (row anatomy and icons) |
 |---|---|
-| ![Panel ZH](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/docs/design/notification-center/panel-zh.png) | ![Narrow](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/docs/design/notification-center/narrow-zh.png) |
+| ![Notification center English](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/center-light-en.png) | ![Design sheet](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/docs/design/notification-center-v2/mockup-zh.png) |
 
 | Light board | Dark board |
 |---|---|

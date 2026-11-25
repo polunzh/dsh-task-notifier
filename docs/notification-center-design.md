@@ -1,5 +1,8 @@
 # 通知中心设计方案
 
+> 2026-11-25 视觉改版 v2：行结构（应用瓦片 + 副行）、插件图标与重复结果合并见
+> [notification-center-visual-refresh-design.md](./notification-center-visual-refresh-design.md)。
+
 ## 1. 背景与目标
 
 现在 `dsh-task-notifier` 的提醒是「任务面板 + 系统通知 + 提示音」：任务面板是侧边栏里的一个入口，只有进入这个面板才看得到；系统通知是瞬时的，错过就没了。用户希望在**任何界面**都能很方便地看到通知，并且把它放在右上角。

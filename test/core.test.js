@@ -5,6 +5,7 @@ import {
   LIMITS,
   appleScriptQuote,
   classifyTurnEnd,
+  coalesceTaskEntries,
   hostMessages,
   isQuotaError,
   normalizeConfig,
@@ -17,6 +18,7 @@ import {
   parseState,
   requestAdmission,
   routeOf,
+  taskEntryKey,
   sanitizeText,
   transitionTask,
   trimNotifications,
@@ -376,4 +378,51 @@ test("parseNotifications 只接受匹配版本，trimNotifications 未读优先�
   const trimmed = trimNotifications(list, 4);
   assert.equal(trimmed.length, 4);
   assert.equal(trimmed.filter((item) => !item.read).length, 4, "先保未读");
+});
+
+test("任务结果合并 key 稳定，脏会话 id 返回 null", () => {
+  assert.equal(taskEntryKey("s1", "completed"), "task:s1:completed");
+  assert.equal(taskEntryKey("s1", "interrupted"), "task:s1:interrupted");
+  assert.equal(taskEntryKey("s1", "weird"), "task:s1:completed", "未知 kind 归到完成，不制造新条目");
+  assert.equal(taskEntryKey("", "completed"), null);
+  assert.equal(taskEntryKey("s1\u0000", "completed"), null);
+});
+
+test("coalesceTaskEntries：同会话同结果折叠，count 累加、ts 取最近、未读优先", () => {
+  const entries = [
+    { id: "task:s1:100", source: "task", sessionId: "s1", kind: "completed", title: "旧标题", ts: 100, read: false, count: 2 },
+    { id: "task:s1:200", source: "task", sessionId: "s1", kind: "completed", title: "新标题", ts: 200, read: true, count: 1 },
+    { id: "task:s1:150", source: "task", sessionId: "s1", kind: "interrupted", title: "中断", ts: 150, read: true, count: 1 },
+    { id: "plugin:p:1", source: "plugin", title: "插件", ts: 120, read: true, count: 1 },
+  ];
+  const merged = coalesceTaskEntries(entries);
+  assert.equal(merged.length, 3, "两种结果各一条 + 插件一条");
+  const done = merged.find((entry) => entry.id === "task:s1:completed");
+  assert.equal(done.count, 3, "两条记录的次数相加");
+  assert.equal(done.ts, 200);
+  assert.equal(done.title, "新标题", "保留最近一次的字段");
+  assert.equal(done.read, false, "任一记录未读则保持未读");
+  assert.equal(merged.find((entry) => entry.id === "task:s1:interrupted").count, 1);
+  assert.equal(merged.find((entry) => entry.id === "plugin:p:1").id, "plugin:p:1", "其它来源不受影响");
+});
+
+test("通知 count 夹在 1..maxCount，旧文件读取时折叠旧 id", () => {
+  const clampedHigh = normalizeNotificationEntry({ id: "c1", source: "plugin", title: "t", count: 1e9 }, 0);
+  assert.equal(clampedHigh.count, LIMITS.maxCount);
+  const clampedLow = normalizeNotificationEntry({ id: "c2", source: "plugin", title: "t", count: -3 }, 0);
+  assert.equal(clampedLow.count, 1);
+  const missing = normalizeNotificationEntry({ id: "c3", source: "plugin", title: "t" }, 0);
+  assert.equal(missing.count, 1);
+
+  const parsed = parseNotifications({
+    version: 1,
+    notifications: [
+      { id: "task:s9:1000", source: "task", sessionId: "s9", kind: "completed", title: "A", ts: 1000, read: true },
+      { id: "task:s9:2000", source: "task", sessionId: "s9", kind: "completed", title: "A", ts: 2000, read: false },
+    ],
+  });
+  assert.equal(parsed.length, 1, "旧 id 折叠成一条");
+  assert.equal(parsed[0].id, "task:s9:completed");
+  assert.equal(parsed[0].count, 2);
+  assert.equal(parsed[0].read, false, "还有一条未读时保持未读");
 });

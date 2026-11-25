@@ -23,6 +23,8 @@ function createHarness(options = {}) {
     logger: { debug() {}, info() {}, warn() {} },
     connection: "connection" in options ? options.connection : { requestRejection: () => undefined },
     sessionQuery: options.sessionQuery,
+    // 可选服务（pluginManager 等）；没有就不注入，插件必须降级而不是崩。
+    get: (name) => options.services?.[name],
     on(name, handler) {
       handlers.set(name, handler);
       return () => handlers.delete(name);
@@ -827,6 +829,86 @@ test("/notify 按通知 id 走强制系统通知（osNotify=off 时不真的发�
   assert.equal(response.status, 200);
   assert.equal(response.json.requested, 1);
   assert.equal(response.json.sent, 0, "osNotify=off 时不应真的弹出");
+});
+
+test("同一会话连续完成只留一条，count 累加、未读不翻倍", async () => {
+  const harness = createHarness();
+  harness.handlers.get("api-session/added")({ id: "sess-merge", title: "合并会话" });
+  for (let round = 0; round < 3; round += 1) {
+    harness.handlers.get("api-session/status")("sess-merge", true);
+    harness.handlers.get("api-session/status")("sess-merge", false);
+    await new Promise((resolve) => setTimeout(resolve, 8));
+  }
+  const state = (await harness.call()).json;
+  const results = state.notifications.filter((item) => item.source === "task");
+  assert.equal(results.length, 1, "同一会话同一种结果只保留一条");
+  assert.equal(results[0].id, "task:sess-merge:completed");
+  assert.equal(results[0].count, 3, "三次完成累加成 count=3");
+  assert.equal(results[0].read, false);
+});
+
+test("已读后再次完成会重新变未读；中断另起一条", async () => {
+  const harness = createHarness();
+  harness.handlers.get("api-session/added")({ id: "sess-re", title: "重开" });
+  harness.handlers.get("api-session/status")("sess-re", true);
+  harness.handlers.get("api-session/status")("sess-re", false);
+  await new Promise((resolve) => setTimeout(resolve, 8));
+
+  let state = (await harness.call()).json;
+  const entry = state.notifications.find((item) => item.source === "task");
+  await harness.call({
+    method: "POST",
+    url: "/task-notifier/api/read",
+    headers: JSON_HEADERS,
+    body: { notificationIds: [entry.id] },
+  });
+  state = (await harness.call()).json;
+  assert.equal(state.notifications.find((item) => item.id === entry.id).read, true);
+
+  harness.handlers.get("api-session/status")("sess-re", true);
+  harness.handlers.get("api-session/status")("sess-re", false);
+  await new Promise((resolve) => setTimeout(resolve, 8));
+  state = (await harness.call()).json;
+  const reopened = state.notifications.find((item) => item.id === entry.id);
+  assert.equal(reopened.read, false, "新的完成事件要重新标未读");
+  assert.equal(reopened.count, 2);
+
+  // 中断是另一种结果，落在另一条 id 上，不覆盖完成条目的计数。
+  harness.handlers.get("api-session/status")("sess-re", true);
+  harness.handlers.get("api-session/error")("sess-re", "boom");
+  await new Promise((resolve) => setTimeout(resolve, 8));
+  state = (await harness.call()).json;
+  const interrupted = state.notifications.find((item) => item.id === "task:sess-re:interrupted");
+  assert.ok(interrupted, "中断应有自己的条目");
+  assert.equal(interrupted.kind, "interrupted");
+  assert.equal(state.notifications.find((item) => item.id === entry.id).count, 2, "完成条目不被中断覆盖");
+});
+
+test("/sources 从 pluginManager 读插件图标，缺失时返回空表", async () => {
+  const icon = "data:image/svg+xml;base64,PHN2Zy8+";
+  const services = {
+    pluginManager: {
+      listBundles: async () => [
+        { name: "@polunzh/dsh-todo", meta: { title: { en: "Todo", zh: "待办清单" }, icon } },
+        { name: "@polunzh/no-icon", meta: { title: "无图标" } },
+      ],
+      listPlugins: async () => [],
+    },
+  };
+  const harness = createHarness({ services });
+  const response = await harness.call({ url: "/task-notifier/api/sources" });
+  assert.equal(response.status, 200);
+  const labels = response.json.sources.flatMap((source) => source.labels);
+  for (const key of ["dsh-todo", "todo", "待办清单", "@polunzh/dsh-todo"]) {
+    assert.ok(labels.includes(key), `应能按 ${key} 匹配`);
+  }
+  assert.equal(response.json.sources.length, 1, "同一个 icon 只出现一份");
+  assert.equal(response.json.sources[0].icon, icon);
+
+  const bare = createHarness();
+  const empty = await bare.call({ url: "/task-notifier/api/sources" });
+  assert.equal(empty.status, 200);
+  assert.deepEqual(empty.json.sources, [], "没有 pluginManager 时降级为空表");
 });
 
 test("通知快照持久化，重启后仍在", async () => {

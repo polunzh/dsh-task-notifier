@@ -332,6 +332,11 @@
         border: 0.5px dashed var(--dsw-alias-border-l2);
         white-space: nowrap;
       }
+      .utility-slot {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+      }
       #main-slot {
         flex: 1;
         min-height: 0;
@@ -490,6 +495,8 @@
           <span class="main-title" id="main-title" data-shell="panelTitle">任务面板</span>
           <span class="main-breadcrumb">dsh-task-notifier</span>
           <span class="main-hint" id="main-hint">mock 数据 · 本地预览</span>
+          <!-- conversation.session.header.utilities slot：?view=panel 时挂铃铛 -->
+          <span class="utility-slot" id="utility-slot"></span>
         </header>
         <!-- main slot：插件 TasksPage 由 React 挂载到这里 -->
         <div id="main-slot"></div>
@@ -559,6 +566,8 @@
         var debugChrome = params.get("debug") === "1";
         // 宿主在重载后会恢复上次打开的主视图会话；?active=<id> 复现这个起点。
         var activeSessionParam = params.get("active") || "";
+        // ?view=panel：把铃铛挂进顶栏 utilities 并展开通知面板（截图用）。
+        var viewParam = params.get("view") || "board";
         // fake ctx.locale 的 active 语言：默认中文，?locale=en 切英文。
         var localeTag = params.get("locale") === "en" ? "en-US" : "zh-CN";
         var shellLang = localeTag.toLowerCase().indexOf("zh") === 0 ? "zh" : "en";
@@ -881,6 +890,90 @@
         };
 
         var tasks = stateName === "empty" ? [] : stateName === "busy" ? busyTasks() : seedTasks();
+
+        /* 通知面板的 mock：同一批事件演示「来源图标 + 合并计数 + 中断徽标」。 */
+        var seedNow = Date.now();
+        var notifications =
+          stateName === "empty"
+            ? []
+            : [
+                {
+                  id: "plugin:dsh-todo:break-end",
+                  source: "plugin",
+                  sourceLabel: "dsh-todo",
+                  kind: "break-end",
+                  title: "休息结束",
+                  body: "回来继续专注吧。",
+                  tone: "info",
+                  ts: seedNow - 20 * 1000,
+                  read: false,
+                },
+                {
+                  id: "task:mnemon:completed",
+                  source: "task",
+                  kind: "completed",
+                  title: "Mnemon idle checkpoint review",
+                  tone: "success",
+                  count: 2,
+                  ts: seedNow - 7 * 60 * 1000,
+                  read: true,
+                },
+                {
+                  id: "task:center:completed",
+                  source: "task",
+                  kind: "completed",
+                  title: "右上角全局通知中心设计",
+                  tone: "success",
+                  count: 5,
+                  ts: seedNow - 9 * 60 * 1000,
+                  read: true,
+                },
+                {
+                  id: "account:quota",
+                  source: "account",
+                  kind: "announcement",
+                  title: "DeepSeek 账号",
+                  body: "本月额度已重置，新的用量周期从现在开始。",
+                  tone: "info",
+                  ts: seedNow - 10 * 60 * 1000,
+                  read: true,
+                },
+                {
+                  id: "task:mnemon:interrupted",
+                  source: "task",
+                  kind: "interrupted",
+                  title: "Mnemon idle checkpoint review",
+                  tone: "warning",
+                  interruptedKind: "process_exit",
+                  ts: seedNow - 12 * 60 * 1000,
+                  read: true,
+                },
+                {
+                  id: "task:pomodoro:completed",
+                  source: "task",
+                  kind: "completed",
+                  title: "番茄钟提醒接入通知中心",
+                  tone: "success",
+                  ts: seedNow - 14 * 60 * 1000,
+                  read: true,
+                },
+                {
+                  id: "task:review:completed",
+                  source: "task",
+                  kind: "completed",
+                  title: "审查通知中心合并策略",
+                  tone: "success",
+                  ts: seedNow - 16 * 60 * 1000,
+                  read: true,
+                },
+              ];
+
+        /* dsh-todo 的图标（data URL），模拟宿主 /sources 的返回。 */
+        var PREVIEW_TODO_ICON =
+          "data:image/svg+xml;base64," +
+          btoa(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7f79ff"/><stop offset="1" stop-color="#4b45cf"/></linearGradient></defs><rect x="8" y="8" width="240" height="240" rx="60" fill="url(#g)"/><path d="M64 138 L100 174 L188 86" fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+          );
         var settings = { sound: true };
         var rev = 1;
 
@@ -890,6 +983,7 @@
 
         function snapshot() {
           return {
+            notifications: clone(notifications),
             tasks: clone(tasks),
             settings: clone(settings),
             rev: rev,
@@ -937,6 +1031,9 @@
           }
           if (path.slice(-7) === "/notify") {
             return jsonResponse({ ok: true, delivered: 1 });
+          }
+          if (path.slice(-8) === "/sources") {
+            return jsonResponse({ sources: [{ labels: ["dsh-todo", "todo"], icon: PREVIEW_TODO_ICON }] });
           }
           if (path.slice(-5) === "/test") {
             return jsonResponse({ ok: true, sent: true });
@@ -1135,6 +1232,7 @@
           // 宿主会用 slots.register 的 meta.label 渲染侧栏项标题；这里对齐。
           var sidebarEntry = entries.get("sidebar.panellist");
           var panelLabel = sidebarEntry && sidebarEntry.meta && sidebarEntry.meta.label;
+          if (typeof panelLabel === "function") panelLabel = panelLabel();
           if (panelLabel) {
             var navLabel = document.getElementById("nav-label");
             var mainTitle = document.getElementById("main-title");
@@ -1158,6 +1256,23 @@
             fail("面板在 9s 内没有渲染出内容", JSON.stringify(collectReport()));
             return;
           }
+
+          if (viewParam === "panel") {
+            var utilityEntry = entries.get("conversation.session.header.utilities");
+            var utilityContainer = document.getElementById("utility-slot");
+            if (utilityEntry && utilityContainer) {
+              ReactDOM.createRoot(utilityContainer).render(React.createElement(utilityEntry.render));
+              await sleep(160);
+              var bell = utilityContainer.querySelector(".dtn-bell");
+              if (bell) bell.click();
+              for (var waitIndex = 0; waitIndex < 60; waitIndex += 1) {
+                if (document.querySelector(".dtn-nc__panel")) break;
+                await sleep(50);
+              }
+              await sleep(260);
+            }
+          }
+
 
           if (filterParam) {
             var chip = document.querySelector('.dtn-chip[data-lane="' + filterParam + '"]');
