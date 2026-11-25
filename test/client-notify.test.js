@@ -67,11 +67,12 @@ test("入口：铃铛在会话头顶栏 utilities，任务面板保留在侧边�
   assert.equal(source.includes("PanelIcon("), false, "旧侧栏图标已替换为 TaskSidebarIcon");
 });
 
-test("通知面板：弹出、筛选、全部已读、展开完整看板", () => {
+test("通知面板：弹出、筛选、全部已读，点击通知直接跳会话", () => {
   assert.match(source, /className: "dtn-nc__panel"/, "有通知面板");
   assert.match(source, /className: "dtn-nc__seg"/, "有全部/未读/待处理分段");
   assert.match(source, /store\.markAllRead\?\.\(\)/, "全部已读走 store");
-  assert.match(source, /setExpanded\(true\)/, "展开完整任务面板");
+  assert.equal(source.includes("setExpanded"), false, "不再提供展开任务面板");
+  assert.match(source, /ctx\.uiWorkspace\?\.openSession\(entry\.sessionId\)/, "点击通知直接打开会话");
 });
 
 test("提示音在 AudioContext 还是 suspended 时先恢复再排音", () => {
