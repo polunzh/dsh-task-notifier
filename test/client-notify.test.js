@@ -59,12 +59,12 @@ test("通知 tag 按会话（或通知 id）区分，避免连续完成被系统
   assert.doesNotMatch(source, /tag: NS \}/, "所有通知共用一个 tag 会互相替换");
 });
 
-test("铃铛是唯一入口，注册在 shell.overlay，不再挂侧边栏", () => {
+test("入口：通知中心在 shell.overlay，任务面板保留在侧边栏", () => {
   assert.match(source, /function NotificationCenterRoot\(/, "应有通知中心组件");
   assert.match(source, /ctx\.slots\.inject\("shell\.overlay"/, "铃铛注册在 shell.overlay");
   assert.match(source, /id: "task-notifier-center"/);
-  assert.equal(source.includes('name: "sidebar.panellist"'), false, "不再注册侧边栏任务面板入口");
-  assert.equal(source.includes("PanelIcon("), false, "侧栏图标已移除");
+  assert.match(source, /ctx\.slots\.inject\("sidebar\.panellist"/, "保留侧边栏任务面板入口");
+  assert.equal(source.includes("PanelIcon("), false, "旧侧栏图标已替换为 TaskSidebarIcon");
 });
 
 test("通知面板：弹出、筛选、全部已读、展开完整看板", () => {
