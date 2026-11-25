@@ -73,6 +73,7 @@ test("通知面板：弹出、筛选、全部已读，点击通知直接跳会�
   assert.match(source, /store\.markAllRead\?\.\(\)/, "全部已读走 store");
   assert.equal(source.includes("setExpanded"), false, "不再提供展开任务面板");
   assert.match(source, /ctx\.uiWorkspace\?\.openSession\(entry\.sessionId\)/, "点击通知直接打开会话");
+  assert.match(source, /ctx\.layout\?\.selectPanel\?\.\(PANEL_ID\)/, "面板底部有跳任务面板按钮");
 });
 
 test("提示音在 AudioContext 还是 suspended 时先恢复再排音", () => {
