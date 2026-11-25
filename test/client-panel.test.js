@@ -40,6 +40,13 @@ test("插件图标：从 /sources 拉一次、10 分钟缓存、按来源名匹�
   assert.match(source, /data\?\.sources \?\? \[\]/);
 });
 
+test("插件名保留在副行开头，缺 sourceLabel 时回落到「插件」", () => {
+  assert.match(source, /const source = entry\.source === "plugin" \? entry\.sourceLabel \|\| t\("center\.source\.plugin"\) : null/);
+  assert.match(source, /className: "dtn-ni__source"/);
+  assert.match(source, /className: "dtn-ni__sep"/);
+  assert.match(source, /const metaLabel = \[meta\.source, meta\.text\]\.filter\(Boolean\)\.join\(" · "\)/, "无障碍标签也要带上插件名");
+});
+
 test("合并结果用副行表达次数，中断优先显示原因", () => {
   assert.match(source, /center\.countCompleted/, "完成 N 次");
   assert.match(source, /center\.countInterrupted/, "中断 N 次");

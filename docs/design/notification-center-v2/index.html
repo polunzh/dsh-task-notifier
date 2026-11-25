@@ -141,6 +141,8 @@
   .r.unread .r-title{font-weight:600}
   .r-time{margin-left:auto;flex:none;font-size:11px;color:var(--label-3);font-variant-numeric:tabular-nums}
   .r-meta{margin-top:2px;font-size:12px;line-height:17px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .r-meta .r-source{color:var(--label-3);font-weight:500}
+  .r-meta .r-sep{margin:0 5px;color:var(--label-3)}
   .r-meta.warn{color:var(--warn-ink)}
   .r-meta.err{color:var(--error-ink)}
   .nc-foot{flex:none;padding:10px 12px;border-top:1px solid var(--border-1)}
@@ -204,7 +206,7 @@
     <div class="head-meta">
       <span class="tagchip">面板 400 × 640</span>
       <span class="tagchip">浅色 / 深色</span>
-      <span class="tagchip">目标版本 1.4.13</span>
+      <span class="tagchip">目标版本 1.4.14</span>
     </div>
   </header>
 
@@ -315,7 +317,7 @@ const before = [
 /* ---------- 数据：改版后（同一批事件，按会话+结果合并） ---------- */
 const after = [
   { group: '今天' },
-  { kind: 'plugin', title: '休息结束', meta: '回来继续专注吧。', time: '刚刚', unread: true },
+  { kind: 'plugin', title: '休息结束', source: 'dsh-todo', meta: '回来继续专注吧。', time: '刚刚', unread: true },
   { kind: 'task', title: 'Mnemon idle checkpoint review', meta: '完成 2 次', time: '7 分钟前' },
   { kind: 'task', title: '右上角全局通知中心设计', meta: '完成 5 次', time: '9 分钟前' },
   { kind: 'account', title: 'DeepSeek 账号', meta: '本月额度已重置，新的用量周期从现在开始。', time: '10 分钟前' },
@@ -368,7 +370,7 @@ function newRow(d) {
     ${t === tile.plugin || t === tile.task || t === tile.account ? t.replace('</span>', badge + dot + '</span>') : t}
     <div class="r-main">
       <div class="r-line"><span class="r-title">${d.title}</span><span class="r-time">${d.time}</span></div>
-      ${d.meta ? `<div class="r-meta${d.metaTone ? ' ' + d.metaTone : ''}">${d.meta}</div>` : ''}
+      ${d.source || d.meta ? `<div class="r-meta${d.metaTone ? ' ' + d.metaTone : ''}">${d.source ? `<span class="r-source">${d.source}</span>${d.meta ? '<span class="r-sep">·</span>' : ''}` : ''}${d.meta ? `<span>${d.meta}</span>` : ''}</div>` : ''}
     </div>
   </div>`;
 }
@@ -407,13 +409,13 @@ shotBefore.innerHTML = `
 
 const shotAfter = document.getElementById('shot-after');
 shotAfter.innerHTML = `
-  <div class="shot-head"><span class="ver ver--new">v1.4.13</span><span class="shot-name">改版</span><span class="shot-note">7 行 · 10 条事件并成 5 行</span></div>
+  <div class="shot-head"><span class="ver ver--new">v2</span><span class="shot-name">改版</span><span class="shot-note">7 行 · 10 条事件并成 5 行</span></div>
   ${newPanel()}
 `;
 
 /* ---------- 行状态 ---------- */
 const cases = [
-  { d: { kind: 'plugin', title: '休息结束', meta: '回来继续专注吧。', time: '刚刚', unread: true }, note: '未读插件行 · 浅底 + 瓦片右上点 + 加粗标题' },
+  { d: { kind: 'plugin', title: '休息结束', source: 'dsh-todo', meta: '回来继续专注吧。', time: '刚刚', unread: true }, note: '未读插件行 · 副行首列是插件名，后接正文' },
   { d: { kind: 'task', title: '番茄钟提醒接入通知中心', time: '14 分钟前' }, note: '已读完成行 · 44px，一个信号都不多' },
   { d: { kind: 'task', title: '右上角全局通知中心设计', meta: '完成 5 次', time: '9 分钟前' }, note: '合并计数 · 副行「完成 5 次」' },
   { d: { kind: 'task', title: 'Mnemon idle checkpoint review', meta: '已中断 · 退出', metaTone: 'warn', badge: 'warn', time: '12 分钟前' }, note: '中断行 · 琥珀徽标 + 结果文案' },

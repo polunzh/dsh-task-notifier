@@ -1,7 +1,7 @@
 # 通知中心视觉改版（v2）实施计划
 
 配套设计：[notification-center-visual-refresh-design.md](./notification-center-visual-refresh-design.md)；高保真稿：[design/notification-center-v2/index.html](./design/notification-center-v2/index.html)。
-基线 `1.4.10`，目标版本 `1.4.13`。
+基线 `1.4.10`，目标版本 `1.4.14`。
 
 ## 0. 前置
 
@@ -51,7 +51,7 @@
 ## 6. 发版
 
 1. `npm test` 全绿；`node test/e2e/native-slot.js` 不被本改动影响，可跳过（无 slot 变更）。
-2. `package.json` 版本 `1.4.10` → `1.4.13`。
+2. `package.json` 版本 `1.4.10` → `1.4.14`。
 3. commit（英文）、push main，`publish.yml` 走 OIDC 发布。
 4. 在 Desktop 里实测一次：dsh-todo 通知出现其图标；连续完成两次同会话只多一行。
 
