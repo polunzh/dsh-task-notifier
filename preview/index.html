@@ -926,7 +926,7 @@
                   tone: "success",
                   count: 5,
                   ts: seedNow - 9 * 60 * 1000,
-                  read: true,
+                  read: false,
                 },
                 {
                   id: "account:quota",
@@ -964,7 +964,7 @@
                   title: "审查通知中心合并策略",
                   tone: "success",
                   ts: seedNow - 16 * 60 * 1000,
-                  read: true,
+                  read: false,
                 },
               ];
 
@@ -1039,6 +1039,13 @@
             if (body.all) {
               tasks = tasks.map(function (task) {
                 return Object.assign({}, task, { unread: false });
+              });
+              notifications = notifications.map(function (item) {
+                return Object.assign({}, item, { read: true });
+              });
+            } else if (Array.isArray(body.notificationIds)) {
+              notifications = notifications.map(function (item) {
+                return body.notificationIds.indexOf(item.id) >= 0 ? Object.assign({}, item, { read: true }) : item;
               });
             } else if (Array.isArray(body.ids)) {
               tasks = tasks.map(function (task) {

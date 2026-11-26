@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>单条消息标为已读 · 设计稿</title>
+<style>
+  :root{
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --bg-base:#fff; --bg-layer:#fff; --bg-module:#f5f6f7; --bg-canvas:#f2f3f5;
+    --label-1:#0f1115; --label-2:#61666b; --label-3:#81858c; --label-4:#adb2b8;
+    --border-1:#0000000a; --border-2:#0000001a; --border-3:#0000001f;
+    --business:#4176e6; --business-weak:#e4edfd;
+    --success:#22c55e; --success-tint:#e6faed;
+    --error:#ec1313; --error-tint:#fdeaea; --error-ink:#c81e1e;
+    --warn:#f59e0b; --warn-ink:#b56a06; --warn-tint:#fef5e7;
+    --hover:#2631480f; --active:#2631481a;
+    --shadow-panel:0 0 0 .5px #00000029,0 3px 8px 0 #00000008,0 0 16px 0 #00000005;
+    --shadow-prominent:0 0 0 .5px #00000029,0 8px 24px 0 #00000014,0 0 32px 0 #0000000d;
+  }
+  [data-theme="dark"]{
+    --bg-base:#141619; --bg-layer:#1b1e23; --bg-module:#1f2328; --bg-canvas:#0f1113;
+    --label-1:#e9ebee; --label-2:#a7adb6; --label-3:#7d838c; --label-4:#5c626b;
+    --border-1:#ffffff10; --border-2:#ffffff1f; --border-3:#ffffff2b;
+    --business:#6f96ec; --business-weak:#1e2a44;
+    --success:#34cf7c; --success-tint:#12281c;
+    --error:#f2555a; --error-tint:#2a1618; --error-ink:#ff8b8e;
+    --warn:#f5a623; --warn-ink:#f3b65a; --warn-tint:#2a2011;
+    --hover:#ffffff12; --active:#ffffff1c;
+    --shadow-panel:0 0 0 .5px #00000066,0 8px 24px 0 #00000066;
+    --shadow-prominent:0 0 0 .5px #00000080,0 12px 40px 0 #00000088;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{color-scheme:light}
+  body{
+    font-family:var(--font);color:var(--label-1);-webkit-font-smoothing:antialiased;
+    background:radial-gradient(circle at 1px 1px,#00000009 1px,transparent 0) 0 0/22px 22px,var(--bg-canvas);
+  }
+  button{font:inherit;color:inherit;background:none;border:0;cursor:default}
+  svg{display:block;flex:none}
+
+  .page{width:1240px;margin:0 auto;padding:40px 0 56px}
+
+  /* ================= 页头 ================= */
+  .head{display:flex;align-items:flex-end;gap:28px;padding:0 4px 28px;border-bottom:1px solid #00000014}
+  .kicker{font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--business);margin-bottom:8px}
+  h1{font-size:27px;font-weight:650;letter-spacing:-.01em}
+  .lede{margin-top:9px;font-size:13px;line-height:1.65;color:var(--label-2);max-width:660px}
+  .head-meta{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .tagchip{font-size:11px;font-weight:600;color:var(--label-2);background:#fff;border:1px solid #00000014;border-radius:20px;padding:5px 10px;white-space:nowrap}
+
+  .sec{padding-top:32px}
+  .sec-head{display:flex;align-items:baseline;gap:10px;padding:0 4px 14px}
+  .sec-head h2{font-size:14px;font-weight:650}
+  .sec-head p{font-size:12px;color:var(--label-3)}
+  .sec-head .num{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:#fff;background:#0f1115;border-radius:5px;padding:2px 6px}
+
+  /* ================= 面板 ================= */
+  .nc{
+    width:400px;display:flex;flex-direction:column;overflow:hidden;position:relative;
+    background:var(--bg-layer);border:1px solid var(--border-2);border-radius:16px;
+    box-shadow:var(--shadow-prominent);
+  }
+  .nc--tall{height:640px}
+  .nc-head{flex:none;height:56px;display:flex;align-items:center;gap:8px;padding:0 10px 0 14px;border-bottom:1px solid var(--border-1)}
+  .nc-bell{color:var(--label-1)}
+  .nc-title{font-size:14px;font-weight:600;letter-spacing:.01em}
+  .nc-chip{font-size:11px;font-weight:600;color:var(--business);background:var(--business-weak);border-radius:9px;padding:1px 7px;line-height:15px}
+  .nc-sp{flex:1}
+  .nc-act{height:30px;display:inline-flex;align-items:center;padding:0 12px;border-radius:9px;background:var(--bg-module);font-size:12px;font-weight:500;color:var(--label-1)}
+  .nc-x{width:32px;height:32px;display:grid;place-items:center;border-radius:8px;color:var(--label-3)}
+
+  .nc-filter{flex:none;display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border-1)}
+  .nc-seg{display:flex;gap:2px;padding:2px;border-radius:9px;background:var(--bg-module)}
+  .nc-seg b{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:400;color:var(--label-2);padding:4px 10px;border-radius:7px}
+  .nc-seg b.on{background:var(--bg-layer);color:var(--label-1);font-weight:600;box-shadow:0 1px 2px #00000014}
+  .nc-seg b i{font-style:normal;font-size:10.5px;font-weight:600;color:var(--label-3)}
+  .nc-funnel{width:28px;height:28px;margin-left:auto;display:grid;place-items:center;border-radius:7px;color:var(--label-3)}
+
+  .nc-body{flex:1;overflow:hidden;padding:2px 0 6px}
+  .nc-group{display:flex;align-items:center;gap:6px;padding:10px 16px 6px;font-size:11px;font-weight:600;letter-spacing:.3px;color:var(--label-3)}
+  .nc-foot{flex:none;padding:10px 12px;border-top:1px solid var(--border-1)}
+  .nc-cta{width:100%;height:36px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:9px;background:var(--bg-module);color:var(--label-1);font-size:12.5px;font-weight:600}
+  .nc-cta svg{color:var(--label-3)}
+
+  /* ================= 行 ================= */
+  .r{display:flex;gap:10px;padding:10px 14px;position:relative}
+  .r + .r::before{content:"";position:absolute;left:14px;right:14px;top:0;height:1px;background:var(--border-1)}
+  .r.unread{background:color-mix(in srgb,var(--business) 4%,transparent)}
+  .r.hover{background:var(--hover)}
+  .tone{width:3px;height:16px;flex:none;margin-top:3px;border-radius:2px;background:var(--label-3)}
+  .tone-ok{background:var(--success)} .tone-warn{background:var(--warn)} .tone-err{background:var(--error)}
+  .tone-info{background:var(--business)} .tone-plugin{background:var(--label-3)}
+  .r-main{flex:1;min-width:0}
+  .r-line{display:flex;align-items:center;gap:8px;min-height:17px}
+  .udot{width:6px;height:6px;flex:none;border-radius:50%;background:var(--business)}
+  .r-title{font-size:13.5px;font-weight:500;color:var(--label-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .r.unread .r-title{font-weight:600}
+  .r-end{position:relative;margin-left:auto;flex:none;display:flex;align-items:center;justify-content:flex-end}
+  .r-time{font-size:11px;color:var(--label-3);font-variant-numeric:tabular-nums;transition:opacity 120ms ease}
+  .r-read{
+    position:absolute;right:-3px;top:50%;transform:translateY(-50%);
+    width:22px;height:22px;display:grid;place-items:center;border-radius:50%;
+    color:var(--label-3);background:transparent;opacity:0;pointer-events:none;
+    transition:opacity 120ms ease,background 120ms ease,color 120ms ease;
+  }
+  .r:hover .r-read,.r.hover .r-read,.r:focus-within .r-read{opacity:1;pointer-events:auto}
+  .r:hover .r-time,.r.hover .r-time,.r:focus-within .r-time{opacity:0}
+  .r-read:hover{background:var(--bg-module);color:var(--label-1)}
+  .r-meta{margin-top:2px;font-size:12px;line-height:17px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .r-meta .r-source{color:var(--label-3);font-weight:500}
+  .r-meta .r-sep{margin:0 5px;color:var(--label-3)}
+  .r-meta.warn{color:var(--warn-ink)}
+  .r-meta.err{color:var(--error-ink)}
+
+  /* ================= 三态放大 ================= */
+  .states{display:flex;flex-direction:column;gap:14px}
+  .state{display:flex;align-items:center;gap:20px}
+  .state-card{width:400px;background:var(--bg-layer);border:1px solid var(--border-2);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-panel)}
+  .state-note{width:320px;font-size:12px;line-height:1.7;color:var(--label-2)}
+  .state-note b{display:block;font-size:12px;font-weight:650;color:var(--label-1);margin-bottom:3px}
+  .state-note code{font-family:"SF Mono",Menlo,monospace;font-size:11px;color:var(--label-2);background:#00000008;border-radius:4px;padding:1px 4px}
+
+  /* ================= 双栏（深色 / 英文） ================= */
+  .duo{display:flex;gap:40px;align-items:flex-start}
+  .cap{display:flex;gap:9px;align-items:center;padding:0 2px 10px;font-size:12px;color:var(--label-3)}
+  .cap b{font-size:12px;font-weight:650;color:var(--label-1)}
+  .cap .dot{width:6px;height:6px;border-radius:50%;background:var(--business)}
+  .dark-wrap{padding:22px;border-radius:16px;background:#0f1113;border:1px solid #ffffff12}
+
+  /* ================= 窄屏 ================= */
+  .narrow{width:390px;background:var(--bg-layer);border:1px solid var(--border-2);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-prominent)}
+  /* 触屏：按钮常驻，在时间右侧 8px；时间照常显示 */
+  .narrow .r-read{position:static;transform:none;opacity:1;pointer-events:auto;margin-left:8px;width:22px;height:22px;background:var(--bg-module)}
+  .narrow .r-time{opacity:1}
+
+  /* ================= 规则表 ================= */
+  .rules{display:flex;gap:20px;align-items:flex-start}
+  .card{background:var(--bg-layer);border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--shadow-panel);padding:18px 20px}
+  .card h3{font-size:12.5px;font-weight:650;margin-bottom:12px}
+  .card h3 span{font-size:11px;font-weight:500;color:var(--label-3);margin-left:6px}
+  table{border-collapse:collapse;width:100%;font-size:12px}
+  th,td{text-align:left;padding:8px 10px 8px 0;vertical-align:top;color:var(--label-2);border-top:1px solid var(--border-1)}
+  th{font-weight:600;color:var(--label-3);font-size:11px;border-top:0;padding-top:0}
+  td b{color:var(--label-1);font-weight:600}
+  td code{font-family:"SF Mono",Menlo,monospace;font-size:11px;background:#00000008;border-radius:4px;padding:1px 4px}
+  .rules-left{width:1180px;flex:none}
+  .rules-right{flex:1}
+  .spec td:first-child{width:236px;white-space:nowrap}
+  .spec td:last-child{color:var(--label-2)}
+  .spec code{white-space:nowrap}
+  .bullet{display:flex;gap:9px;font-size:12px;line-height:1.7;color:var(--label-2);padding:6px 0}
+  .bullet i{width:5px;height:5px;border-radius:50%;background:var(--label-4);margin-top:8px;flex:none}
+  .bullet b{color:var(--label-1);font-weight:600}
+
+  .deltas{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+  .delta{display:flex;flex-direction:column;gap:6px;padding:14px 16px;border-radius:12px;background:var(--bg-layer);border:1px solid var(--border-2);box-shadow:var(--shadow-panel)}
+  .delta span{font-size:10.5px;font-weight:600;letter-spacing:.02em;color:var(--label-3)}
+  .delta b{font-size:14px;font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .delta b i{font-style:normal;color:var(--label-4);font-size:12px;margin:0 4px}
+  .delta b em{font-style:normal;color:var(--business)}
+  .delta-note{margin-top:12px;padding:12px 16px;border-radius:12px;background:#00000005;font-size:11.5px;line-height:1.65;color:var(--label-2)}
+  .delta-note code{font-family:"SF Mono",Menlo,monospace;font-size:11px;background:#00000008;border-radius:4px;padding:1px 4px}
+
+  .foot{padding:30px 4px 0;font-size:11.5px;color:var(--label-3)}
+  .foot code{font-family:"SF Mono",Menlo,monospace;font-size:11px;background:#00000008;border-radius:4px;padding:1px 5px}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="head">
+    <div>
+      <div class="kicker">DSH-TASK-NOTIFIER · 通知中心</div>
+      <h1>单条消息标为已读</h1>
+      <p class="lede">未读行在 hover / 键盘聚焦时，把右侧时间换成一枚 22px 对勾按钮；点它只标已读，不跳转、不收起面板。已读行保持只有时间。同一套行结构、色条、副行都不动。</p>
+    </div>
+    <div class="head-meta">
+      <span class="tagchip">面板 400 × 640</span>
+      <span class="tagchip">浅色 / 深色</span>
+      <span class="tagchip">目标版本 1.4.18</span>
+    </div>
+  </div>
+
+  <!-- ============ 面板 ============ -->
+  <div class="sec">
+    <div class="sec-head"><span class="num">01</span><h2>通知面板 · 浅色</h2><p>7 条消息，3 条未读；第 2 行处于 hover 态，「休息结束」右侧时间让位给对勾</p></div>
+    <div class="nc nc--tall">
+      <div class="nc-head">
+        <svg class="nc-bell" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <span class="nc-title">通知</span>
+        <span class="nc-chip">3 未读</span>
+        <span class="nc-sp"></span>
+        <button class="nc-act">全部已读</button>
+        <button class="nc-x"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="nc-filter">
+        <div class="nc-seg">
+          <b class="on">全部</b>
+          <b>未读 <i>3</i></b>
+          <b>待处理</b>
+        </div>
+        <button class="nc-funnel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg></button>
+      </div>
+      <div class="nc-body" id="panel-zh"></div>
+      <div class="nc-foot">
+        <button class="nc-cta"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>打开任务面板</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 三态 ============ -->
+  <div class="sec">
+    <div class="sec-head"><span class="num">02</span><h2>单条行 · 三个状态</h2><p>同一行 400px 宽度下：默认 / hover、键盘聚焦 / 点击之后</p></div>
+    <div class="states">
+      <div class="state">
+        <div class="state-card" id="state-a"></div>
+        <div class="state-note">
+          <b>① 未读 · 默认</b>
+          右侧是时间。未读只靠 6px 蓝点、浅底和 600 字重表达，行上不增加任何常驻按钮。
+        </div>
+      </div>
+      <div class="state">
+        <div class="state-card" id="state-b"></div>
+        <div class="state-note">
+          <b>② 未读 · hover / focus-within</b>
+          时间 120ms 淡出，22px 对勾淡入，位置右对齐。按钮绝对定位在时间槽里，行宽和标题截断都不变，不会抖。
+        </div>
+      </div>
+      <div class="state">
+        <div class="state-card" id="state-c"></div>
+        <div class="state-note">
+          <b>③ 点击之后 · 已读</b>
+          蓝点、浅底、加粗同时撤掉；面板不收起、会话不切换；按钮消失，右侧回到时间。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 计数 ============ -->
+  <div class="sec">
+    <div class="sec-head"><span class="num">03</span><h2>点击后的计数联动</h2><p>标记「审查通知中心合并策略」这一条</p></div>
+    <div class="deltas">
+      <div class="delta"><span>铃铛角标</span><b>3 <i>→</i> <em>2</em></b></div>
+      <div class="delta"><span>头部 chip</span><b>3 未读 <i>→</i> <em>2 未读</em></b></div>
+      <div class="delta"><span>「未读」分段</span><b>3 <i>→</i> <em>2</em></b></div>
+      <div class="delta"><span>该行状态</span><b>未读 <i>→</i> <em>已读</em></b></div>
+      <div class="delta"><span>面板</span><b><em>保持展开</em></b></div>
+      <div class="delta"><span>会话</span><b><em>不切换</em></b></div>
+    </div>
+    <p class="delta-note">在「未读」筛选下，标已读的这一行立刻从列表消失，清空后显示空态；任务来源的条目同时清掉看板里该会话的未读（沿用宿主 <code>/read</code> 现有行为）。</p>
+  </div>
+
+  <!-- ============ 深色 / 英文 ============ -->
+  <div class="sec">
+    <div class="sec-head"><span class="num">04</span><h2>深色与英文</h2><p>对勾用 <code>label-tertiary</code>，hover 时变 <code>label-primary</code>；英文沿用同一按钮位置</p></div>
+    <div class="duo">
+      <div>
+        <div class="cap"><span class="dot"></span><b>深色 · hover 第 3 行</b><span>400 × 640</span></div>
+        <div class="dark-wrap" data-theme="dark">
+          <div class="nc nc--tall">
+            <div class="nc-head">
+              <svg class="nc-bell" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+              <span class="nc-title">通知</span>
+              <span class="nc-chip">3 未读</span>
+              <span class="nc-sp"></span>
+              <button class="nc-act">全部已读</button>
+              <button class="nc-x"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            </div>
+            <div class="nc-filter">
+              <div class="nc-seg">
+                <b class="on">全部</b>
+                <b>未读 <i>3</i></b>
+                <b>待处理</b>
+              </div>
+              <button class="nc-funnel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg></button>
+            </div>
+            <div class="nc-body" id="panel-dark"></div>
+            <div class="nc-foot">
+              <button class="nc-cta"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>打开任务面板</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="cap"><span class="dot"></span><b>英文 · hover 第 2 行</b><span>400 × 640</span></div>
+        <div class="nc nc--tall" id="panel-en">
+          <div class="nc-head">
+            <svg class="nc-bell" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            <span class="nc-title">Notifications</span>
+            <span class="nc-chip">3 unread</span>
+            <span class="nc-sp"></span>
+            <button class="nc-act">Mark all read</button>
+            <button class="nc-x"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          </div>
+          <div class="nc-filter">
+            <div class="nc-seg">
+              <b class="on">All</b>
+              <b>Unread <i>3</i></b>
+              <b>Todo</b>
+            </div>
+            <button class="nc-funnel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg></button>
+          </div>
+          <div class="nc-body" id="panel-en-body"></div>
+          <div class="nc-foot">
+            <button class="nc-cta"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Open task panel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 窄屏 ============ -->
+  <div class="sec">
+    <div class="sec-head"><span class="num">05</span><h2>窄屏 390 · 触屏</h2><p>没有 hover：未读行的对勾常驻在时间右侧 8px，按钮 22px 不和时间重叠</p></div>
+    <div class="rules">
+      <div class="narrow">
+        <div class="nc-head">
+          <svg class="nc-bell" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+          <span class="nc-title">通知</span>
+          <span class="nc-chip">3 未读</span>
+          <span class="nc-sp"></span>
+          <button class="nc-act">全部已读</button>
+          <button class="nc-x"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div class="nc-filter">
+          <div class="nc-seg">
+            <b class="on">全部</b>
+            <b>未读 <i>3</i></b>
+            <b>待处理</b>
+          </div>
+          <button class="nc-funnel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg></button>
+        </div>
+        <div class="nc-body" id="panel-narrow"></div>
+        <div class="nc-foot">
+          <button class="nc-cta"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>打开任务面板</button>
+        </div>
+      </div>
+      <div class="rules-right">
+        <div class="card">
+          <h3>规则</h3>
+          <div class="bullet"><i></i><span><b>显隐</b>：<code>.dtn-ni:hover</code>、<code>:focus-within</code> 显示；触屏与 &lt;640px 常驻。</span></div>
+          <div class="bullet"><i></i><span><b>只服务未读</b>：已读行不渲染按钮，右侧只有时间。</span></div>
+          <div class="bullet"><i></i><span><b>点按钮不点行</b>：<code>stopPropagation</code> + 行 handler 的 target 守卫，Enter / Space 同理。</span></div>
+          <div class="bullet"><i></i><span><b>文案</b>：复用 <code>action.markRead</code>（标为已读 / Mark read），只出现在 <code>aria-label</code> 与 <code>title</code>，不新增 key。</span></div>
+          <div class="bullet"><i></i><span><b>不改</b>：色条、未读点、字重、分隔线、行高（44–62px）、点开跳转的行为。</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 视觉规格 ============ -->
+  <div class="sec">
+    <div class="sec-head"><span class="num">06</span><h2>视觉规格</h2><p>全部取宿主现有 token，不新增颜色</p></div>
+    <div class="card rules-left">
+      <table>
+        <tr><th>部位</th><th>规格</th></tr>
+        <tr><td><b>右侧槽位</b> <code>.dtn-ni__end</code></td><td>由时间宽度决定，<code>margin-left:auto</code>；按钮绝对定位 <code>right:0</code> 居中，不参与行宽计算</td></tr>
+        <tr><td><b>对勾按钮</b> <code>.dtn-ni__read</code></td><td><code>22×22</code>，圆角 <code>50%</code>，图标 <code>check</code> <code>13px</code>，颜色 <code>label-tertiary</code></td></tr>
+        <tr><td><b>显隐过渡</b></td><td><code>opacity 120ms ease</code>；时间同帧淡出，不改变行高</td></tr>
+        <tr><td><b>按钮 hover</b></td><td>背景 <code>--dsw-alias-bg-module-platform</code>，图标 <code>label-primary</code></td></tr>
+        <tr><td><b>键盘焦点</b></td><td>宿主 <code>:focus-visible</code> 焦点环，<code>outline-offset:2px</code></td></tr>
+        <tr><td><b>触屏 / 窄屏</b></td><td><code>@media (hover:none), (max-width:640px)</code>：按钮 <code>position:static</code>、<code>opacity:1</code>，<code>margin-left:8px</code></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="foot">设计稿：<code>docs/design/per-message-mark-read/index.html</code>　·　实现范围：<code>lib/client.js</code> 行组件与样式　·　设计说明：<code>docs/per-message-mark-read.md</code></div>
+</div>
+
+<script>
+  const rows = [
+    { tone:"plugin", title:"休息结束", unread:true, meta:[["插件：dsh-todo","source"],["回来继续专注吧。","text"]], time:"刚刚", hover:true },
+    { tone:"ok", title:"Mnemon idle checkpoint review", unread:false, meta:[["任务","source"],["完成 2 次","text"]], time:"7 分钟前" },
+    { tone:"ok", title:"右上角全局通知中心设计", unread:true, meta:[["任务","source"],["完成 5 次","text"]], time:"9 分钟前" },
+    { tone:"info", title:"DeepSeek 账号", unread:false, meta:[["账号公告","source"],["本月额度已重置，新的用量周期从现在开始。","text"]], time:"10 分钟前" },
+    { tone:"warn", title:"Mnemon idle checkpoint review", unread:false, metaWarn:true, meta:[["任务","source"],["已中断 · 退出","text"]], time:"12 分钟前" },
+    { tone:"ok", title:"番茄提醒接入通知中心", unread:false, meta:[["任务","source"]], time:"14 分钟前" },
+    { tone:"ok", title:"审查通知中心合并策略", unread:true, meta:[["任务","source"]], time:"16 分钟前" },
+    { tone:"ok", title:"慢速模型切换评估", unread:false, meta:[["任务","source"],["完成 1 次","text"]], time:"19 分钟前" },
+  ];
+  const rowsEn = [
+    { tone:"plugin", title:"Rest ended", unread:true, meta:[["Plugin: dsh-todo","source"],["Back to focus.","text"]], time:"Just now" },
+    { tone:"ok", title:"Mnemon idle checkpoint review", unread:true, hover:true, meta:[["Task","source"],["Completed 2×","text"]], time:"7m ago" },
+    { tone:"ok", title:"Global notification center design", unread:true, meta:[["Task","source"],["Completed 5×","text"]], time:"9m ago" },
+    { tone:"info", title:"DeepSeek account", unread:false, meta:[["Account","source"],["Quota reset for the new billing period.","text"]], time:"10m ago" },
+    { tone:"warn", title:"Mnemon idle checkpoint review", unread:false, metaWarn:true, meta:[["Task","source"],["Interrupted · exit","text"]], time:"12m ago" },
+    { tone:"ok", title:"Pomodoro notices in the center", unread:false, meta:[["Task","source"]], time:"14m ago" },
+    { tone:"ok", title:"Review the merge strategy", unread:false, meta:[["Task","source"]], time:"16m ago" },
+    { tone:"ok", title:"Slow-model switch review", unread:false, meta:[["Task","source"],["Completed 1×","text"]], time:"19m ago" },
+  ];
+
+  const CHECK = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m20 6-11 11-5-5"/></svg>';
+
+  function rowHtml(r, opts = {}) {
+    const cls = ["r", r.unread ? "unread" : "", r.hover ? "hover" : ""].filter(Boolean).join(" ");
+    const dot = r.unread ? '<span class="udot"></span>' : "";
+    const metaCls = "r-meta" + (r.metaWarn ? " warn" : "");
+    const meta = r.meta.map(([text, kind], i) => {
+      const cls2 = kind === "source" ? "r-source" : "";
+      const sep = i > 0 ? '<span class="r-sep">·</span>' : "";
+      return `${sep}<span class="${cls2}">${text}</span>`;
+    }).join("");
+    const readBtn = r.unread && !opts.noButton
+      ? `<button class="r-read" aria-label="${opts.label || "标为已读"}" title="${opts.label || "标为已读"}">${CHECK}</button>`
+      : "";
+    return `<div class="${cls}">
+      <span class="tone tone-${r.tone}"></span>
+      <div class="r-main">
+        <div class="r-line">${dot}<span class="r-title">${r.title}</span>
+          <span class="r-end"><span class="r-time">${r.time}</span>${readBtn}</span>
+        </div>
+        <div class="${metaCls}">${meta}</div>
+      </div>
+    </div>`;
+  }
+
+  function body(rows, opts) {
+    return `<div class="nc-group">今天</div>` + rows.map((r) => rowHtml(r, opts)).join("");
+  }
+
+  document.getElementById("panel-zh").innerHTML = body(rows.slice(0, 7));
+  const darkRows = rows.slice(0, 7).map((r, i) => ({ ...r, hover: i === 2 }));
+  document.getElementById("panel-dark").innerHTML = body(darkRows);
+  document.getElementById("panel-en-body").innerHTML = body(rowsEn, { label:"Mark read" });
+  document.getElementById("panel-narrow").innerHTML = body(rows.slice(0, 5).map((r) => ({ ...r, hover:false })));
+
+  const base = rows[0];
+  document.getElementById("state-a").innerHTML = rowHtml({ ...base, hover:false });
+  document.getElementById("state-b").innerHTML = rowHtml({ ...base, hover:true });
+  document.getElementById("state-c").innerHTML = rowHtml({ ...base, hover:false, unread:false, time:"刚刚" });
+</script>
+</body>
+</html>

@@ -75,7 +75,7 @@ interface NotificationEntry {
 }
 ```
 
-- **未读**：每条自带 `read`；铃铛角标 = 未读总数。打开某项或进入对应会话即标已读；「全部已读」一次清空。
+- **未读**：每条自带 `read`；铃铛角标 = 未读总数。打开某项或进入对应会话即标已读；未读行 hover 时右侧出现对勾，可只标这一条；「全部已读」一次清空。
 - **去重**：按 `id`（任务类用 `task:<sessionId>:<completedAt>`；账号类用公告 id；插件类由发布方给稳定 id）。
 - **持久化**：宿主写 `$DSH_HOME/storages/dsh-task-notifier/notifications.json`，最多保留 200 条；账号公告的已读状态单独按 id 记录，正文仍以远端为准。
 

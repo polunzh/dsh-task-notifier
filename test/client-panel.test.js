@@ -78,3 +78,37 @@ test("中英文案都补齐新 key", () => {
     assert.ok(en.includes(`"${key}"`), `英文缺 ${key}`);
   }
 });
+
+test("每条消息都能单独标已读：未读行渲染对勾，已读行不渲染", () => {
+  assert.match(source, /className: `dtn-ni__shell\$\{entry\.read \? "" : " is-unread"\}`/, "行外再包一层 shell");
+  assert.match(source, /entry\.read\s*\? null\s*: h\(\s*"button"/, "按钮只在未读行出现");
+  assert.match(source, /className: "dtn-ni__read"/);
+  assert.match(source, /t\("action\.markRead"\)/, "复用已有文案，不新增 key");
+  assert.match(source, /onMarkRead: markEntryRead/, "行拿到单条已读回调");
+  assert.match(source, /const markEntryRead = \(entry\) => \{/, "账号与宿主两条路径收在一个函数里");
+  assert.match(source, /const openEntry = async \(entry\) => \{\s*markEntryRead\(entry\);/, "点开行复用同一个已读入口");
+});
+
+test("对勾按钮与 role=button 的行平级，hover / 聚焦才让时间让位", () => {
+  const rowStart = source.indexOf("function NotificationRow(props)");
+  const rowSource = source.slice(rowStart, source.indexOf("/** 侧边栏任务面板入口图标", rowStart));
+  const rowButton = rowSource.indexOf('role: "button"');
+  const actionButton = rowSource.indexOf('className: "dtn-ni__read"');
+  assert.ok(rowButton >= 0, "行仍是可聚焦的按钮");
+  assert.ok(actionButton > rowButton, "对勾在行节点之后，不嵌进 role=button 里");
+  assert.match(
+    rowSource,
+    /\n        entry\.read\n          \? null\n          : h\(\n              "button",\n              \{\n                type: "button",\n                className: "dtn-ni__read",/,
+    "对勾是外层 h() 的第三个参数，与行平级",
+  );
+  assert.match(source, /\.dtn-ni__shell:hover \.dtn-ni__read/);
+  assert.match(source, /\.dtn-ni__shell:focus-within \.dtn-ni__read/);
+  assert.match(source, /\.dtn-ni__shell:hover \.dtn-ni__time/);
+  assert.match(source, /transition: opacity 120ms ease/);
+});
+
+test("触屏与窄屏没有 hover：未读行常驻对勾，时间照常显示", () => {
+  assert.match(source, /@media \(hover: none\), \(max-width: 640px\) \{/);
+  assert.match(source, /\.dtn-ni\.is-unread \{ padding-right: 40px; \}/);
+  assert.match(source, /\.dtn-ni__read \{ opacity: 1; pointer-events: auto; right: 10px; \}/);
+});

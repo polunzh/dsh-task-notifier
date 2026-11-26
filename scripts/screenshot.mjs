@@ -99,7 +99,8 @@ const shots = [
     theme: "light",
     kind: "filled",
     url: "?state=filled&theme=light&view=panel",
-    narrative: "浅色 · 右上角通知中心（应用图标 + 合并计数 + 中断徽标）",
+    hoverRow: true,
+    narrative: "浅色 · 右上角通知中心（悬停未读行显示单条已读对勾）",
   },
   {
     name: "center-dark",
@@ -118,7 +119,8 @@ const shots = [
     kind: "filled",
     locale: "en",
     url: "?state=filled&theme=light&locale=en&view=panel",
-    narrative: "浅色 · 英文界面的通知中心",
+    hoverRow: true,
+    narrative: "浅色 · 英文界面的通知中心（悬停未读行）",
   },
   {
     name: "empty",
@@ -633,6 +635,32 @@ function validateShot(shot, info) {
   return problems;
 }
 
+/** 悬停通知中心里第一条未读行，让单条已读对勾显形；拍不到就报错。 */
+async function hoverFirstUnreadRow(cdp, sessionId) {
+  const point = await evaluate(
+    cdp,
+    sessionId,
+    `(() => {
+      const row = document.querySelector(".dtn-ni__shell.is-unread .dtn-ni");
+      if (!row) return null;
+      const rect = row.getBoundingClientRect();
+      return { x: Math.round(rect.x + rect.width / 2), y: Math.round(rect.y + rect.height / 2) };
+    })()`,
+  );
+  if (!point) throw new Error("截图上要悬停未读行，但面板里没有未读行");
+  await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x, y: point.y, buttons: 0 }, sessionId);
+  await sleep(260);
+  const opacity = await evaluate(
+    cdp,
+    sessionId,
+    `(() => {
+      const button = document.querySelector(".dtn-ni__shell.is-unread .dtn-ni__read");
+      return button ? Number(getComputedStyle(button).opacity) : 0;
+    })()`,
+  );
+  if (opacity !== 1) throw new Error(`悬停未读行后单条已读对勾没有显形（opacity=${opacity}）`);
+}
+
 async function captureShot(cdp, shot, baseUrl, pageErrors) {
   const errors = [];
   const { targetId } = await cdp.send("Target.createTarget", { url: "about:blank" });
@@ -665,6 +693,9 @@ async function captureShot(cdp, shot, baseUrl, pageErrors) {
 
     // 留一点时间让 pollLoop 完成一次刷新、字体落定。
     await sleep(settleMs);
+
+    // 单条已读只在 hover / 聚焦时显形，截图要悬停到第一条未读行才能拍到。
+    if (shot.hoverRow) await hoverFirstUnreadRow(cdp, sessionId);
 
     const info = await inspectPage(cdp, sessionId);
     const problems = validateShot(shot, info);
