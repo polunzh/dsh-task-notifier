@@ -812,6 +812,70 @@ test("任务完成会生成一条 task 通知，/read 时同步任务未读", as
   assert.equal(after.tasks.find((item) => item.id === "sess-n").unread, false, "通知已读要同步任务");
 });
 
+test("子代理会话的收尾不单独发通知", async () => {
+  const harness = createHarness();
+  const added = harness.handlers.get("api-session/added");
+  added({ id: "sess-p", title: "父任务" });
+  added({
+    id: "sess-child",
+    title: "子任务：校验缓存命中率",
+    header: { id: "sess-child", parentSession: "sess-p", delegationDepth: 1, origin: "subagent" },
+  });
+  harness.handlers.get("api-session/status")("sess-child", true);
+  harness.handlers.get("api-session/status")("sess-child", false);
+  await new Promise((resolve) => setTimeout(resolve, 12));
+  const state = (await harness.call()).json;
+  assert.deepEqual(state.notifications.filter((item) => item.sessionId === "sess-child"), [], "子代理不写通知");
+  assert.equal(state.tasks.find((item) => item.id === "sess-child").unread, true, "看板里仍然标未读");
+
+  // 父会话收尾才是要提醒的那次。
+  harness.handlers.get("api-session/status")("sess-p", true);
+  harness.handlers.get("api-session/status")("sess-p", false);
+  await new Promise((resolve) => setTimeout(resolve, 12));
+  const after = (await harness.call()).json;
+  assert.equal(after.notifications.filter((item) => item.source === "task").length, 1);
+  assert.equal(after.notifications.find((item) => item.source === "task").sessionId, "sess-p");
+});
+
+test("会话头没走事件时，从标题快照补齐谱系并跳过子代理通知", async () => {
+  const sessionQuery = {
+    async readTitleSnapshots(ids) {
+      return ids.map((id) => ({
+        status: "fulfilled",
+        value: {
+          session: { id, parentSession: "sess-root", delegationDepth: 1, origin: "subagent" },
+          title: { title: "Mnemon idle checkpoint review" },
+        },
+      }));
+    },
+  };
+  const harness = createHarness({ sessionQuery });
+  harness.handlers.get("api-session/added")({ id: "run-1", title: "Mnemon idle checkpoint review" });
+  harness.handlers.get("api-session/status")("run-1", true);
+  harness.handlers.get("api-session/status")("run-1", false);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const state = (await harness.call()).json;
+  assert.equal(state.notifications.filter((item) => item.source === "task").length, 0, "子代理不发通知");
+  assert.equal(state.tasks.find((task) => task.id === "run-1").parentId, "sess-root", "谱系要补上");
+});
+
+test("后台任务同一标题在窗口内合并成一条，点开指向最近一次会话", async () => {
+  const harness = createHarness();
+  const added = harness.handlers.get("api-session/added");
+  for (const id of ["mnemon-1", "mnemon-2"]) {
+    added({ id, title: "Mnemon idle checkpoint review" });
+    harness.handlers.get("api-session/status")(id, true);
+    harness.handlers.get("api-session/status")(id, false);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  const state = (await harness.call()).json;
+  const results = state.notifications.filter((item) => item.source === "task");
+  assert.equal(results.length, 1, "同标题的两次运行只留一行");
+  assert.equal(results[0].count, 2);
+  assert.equal(results[0].sessionId, "mnemon-2", "点开指向最近一次");
+  assert.equal(results[0].read, false);
+});
+
 test("/notify 按通知 id 走强制系统通知（osNotify=off 时不真的发）", async () => {
   const harness = createHarness({ config: { osNotify: "off" } });
   await harness.call({

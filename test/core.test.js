@@ -6,6 +6,8 @@ import {
   appleScriptQuote,
   classifyTurnEnd,
   coalesceTaskEntries,
+  coalesceTaskTitles,
+  findTaskTwin,
   hostMessages,
   isQuotaError,
   normalizeConfig,
@@ -371,7 +373,8 @@ test("parseNotifications 只接受匹配版本，trimNotifications 未读优先�
     ],
   });
   assert.equal(parsed.length, 2);
-  assert.equal(parsed[1].source, "plugin");
+  // 读取后按 ts 倒序（同标题折叠需要），这里只校验内容不校验位置。
+  assert.equal(parsed.find((entry) => entry.id === "b").source, "plugin");
 
   const list = [];
   for (let i = 0; i < 10; i += 1) list.push({ id: `n${i}`, ts: i, read: i < 6 });
@@ -425,4 +428,46 @@ test("通知 count 夹在 1..maxCount，旧文件读取时折叠旧 id", () => {
   assert.equal(parsed[0].id, "task:s9:completed");
   assert.equal(parsed[0].count, 2);
   assert.equal(parsed[0].read, false, "还有一条未读时保持未读");
+});
+
+test("findTaskTwin 只在同标题、同结果、窗口内匹配", () => {
+  const list = [
+    { id: "task:a:completed", source: "task", kind: "completed", title: "巡检", ts: 1000 },
+    { id: "task:b:completed", source: "task", kind: "completed", title: "巡检", ts: 5000 },
+    { id: "task:c:completed", source: "task", kind: "completed", title: "别的任务", ts: 5000 },
+    { id: "task:d:interrupted", source: "task", kind: "interrupted", title: "巡检", ts: 5000 },
+    { id: "plugin:p:1", source: "plugin", kind: "completed", title: "巡检", ts: 5000 },
+  ];
+  assert.equal(findTaskTwin(list, { title: "巡检", kind: "completed", at: 6000 }).id, "task:b:completed", "取最近的一条");
+  assert.equal(findTaskTwin(list, { title: "巡检", kind: "completed", at: 3000, windowMs: 1000 }), null, "窗口外不合并");
+  assert.equal(findTaskTwin(list, { title: "巡检", kind: "interrupted", at: 6000 }).id, "task:d:interrupted");
+  assert.equal(findTaskTwin(list, { title: "   ", kind: "completed", at: 6000 }), null);
+  assert.equal(findTaskTwin(list, { title: "巡检", kind: "completed", at: 6000 }).source, "task");
+});
+
+test("coalesceTaskTitles：窗口内同标题的后台运行收成一条", () => {
+  const list = [
+    { id: "a", source: "task", kind: "completed", title: "巡检", ts: 5000, read: true, count: 1, sessionId: "s5" },
+    { id: "b", source: "task", kind: "completed", title: "巡检", ts: 3000, read: false, count: 1, sessionId: "s3" },
+    { id: "c", source: "task", kind: "completed", title: "巡检", ts: 1000, read: true, count: 2, sessionId: "s1" },
+    { id: "d", source: "task", kind: "completed", title: "别的", ts: 4000, read: true, count: 1, sessionId: "s4" },
+    { id: "e", source: "task", kind: "interrupted", title: "巡检", ts: 4500, read: true, count: 1, sessionId: "s6" },
+  ];
+  const out = coalesceTaskTitles(list);
+  const merged = out.filter((entry) => entry.title === "巡检" && entry.kind === "completed");
+  assert.equal(merged.length, 1, "同标题同结果只留一条");
+  assert.equal(merged[0].count, 4, "次数相加");
+  assert.equal(merged[0].ts, 5000);
+  assert.equal(merged[0].sessionId, "s5", "点开指向最近一次会话");
+  assert.equal(merged[0].read, false, "任一条未读则整体未读");
+  assert.equal(out.filter((entry) => entry.title === "巡检" && entry.kind === "interrupted").length, 1, "中断不与完成合并");
+
+  const far = coalesceTaskTitles(
+    [
+      { id: "x", source: "task", kind: "completed", title: "巡检", ts: 0, read: true, count: 1 },
+      { id: "y", source: "task", kind: "completed", title: "巡检", ts: 10_000, read: true, count: 1 },
+    ],
+    5_000,
+  );
+  assert.equal(far.length, 2, "窗口外不合并");
 });
