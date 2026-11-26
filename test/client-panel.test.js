@@ -17,34 +17,31 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const source = readFileSync(join(root, "lib", "client.js"), "utf8");
 
-test("行结构：应用瓦片 + 标题 + 可选副行，旧的色条/chip/打开链接都移除", () => {
-  assert.match(source, /function SourceTile\(props\)/);
-  assert.match(source, /className: "dtn-ni__tile dtn-ni__tile--task"/);
-  assert.match(source, /className: "dtn-ni__tile dtn-ni__tile--account"/);
-  assert.match(source, /className: "dtn-ni__tile dtn-ni__tile--plugin"/);
-  assert.match(source, /dtn-ni__dot/, "未读点画在瓦片上");
-  assert.match(source, /dtn-ni__badge--/, "中断徽标画在瓦片上");
-  assert.equal(source.includes("dtn-ni__tone"), false, "不再有色条");
+test("行结构：色条 + 标题 + 可选副行，没有应用瓦片", () => {
+  assert.match(source, /dtn-ni__tone dtn-ni__tone--\$\{rowTone\(entry\)\}/);
+  assert.match(source, /function rowTone\(entry\)/);
+  assert.match(source, /dtn-ni__tone--ok/, "完成=绿");
+  assert.match(source, /dtn-ni__tone--warn/, "中断=琥珀");
+  assert.match(source, /dtn-ni__tone--err/, "报错=红");
+  assert.match(source, /dtn-ni__tone--info/, "账号=蓝");
+  assert.match(source, /dtn-ni__unread/, "未读点回到标题前");
+  assert.equal(source.includes("dtn-ni__tile"), false, "不再有应用瓦片");
+  assert.equal(source.includes("dtn-ni__badge"), false, "异常用色条表达，不再叠徽标");
   assert.equal(source.includes("dtn-ni__tag"), false, "不再有来源/状态 chip");
   assert.equal(source.includes("dtn-ni__open"), false, "不再有「打开」链接");
 });
 
-test("插件图标：从 /sources 拉一次、10 分钟缓存、按来源名匹配、失败降级", () => {
-  assert.match(source, /fetchJson\(`\$\{API\}\/sources`\)/);
-  assert.match(source, /SOURCE_ICON_TTL = 10 \* 60 \* 1000/);
-  assert.match(source, /function sourceLabelKeys\(label\)/);
-  assert.match(source, /function sourceIconFor\(label, icons\)/);
-  assert.match(source, /className: "dtn-ni__tile-img"/);
-  assert.match(source, /onError: \(event\) => \{\s*event\.currentTarget\.style\.opacity = "0";/, "图片失败时露出底层拼图瓦片");
-  assert.match(source, /h\(Icon, \{ name: "plugin", size: 15 \}\)/, "降级瓦片是拼图");
-  assert.match(source, /data\?\.sources \?\? \[\]/);
-});
-
-test("插件名保留在副行开头，缺 sourceLabel 时回落到「插件」", () => {
-  assert.match(source, /const source = entry\.source === "plugin" \? entry\.sourceLabel \|\| t\("center\.source\.plugin"\) : null/);
+test("插件来源用文字标识：副行开头「插件：dsh-todo」", () => {
+  assert.match(source, /const source =\s*entry\.source === "plugin"\s*\? entry\.sourceLabel\s*\? t\("center\.pluginPrefix", \{ name: entry\.sourceLabel \}\)\s*: t\("center\.source\.plugin"\)/);
   assert.match(source, /className: "dtn-ni__source"/);
   assert.match(source, /className: "dtn-ni__sep"/);
-  assert.match(source, /const metaLabel = \[meta\.source, meta\.text\]\.filter\(Boolean\)\.join\(" · "\)/, "无障碍标签也要带上插件名");
+  assert.match(source, /const metaLabel = \[meta\.source, meta\.text\]\.filter\(Boolean\)\.join\(" · "\)/, "无障碍标签也要带上来源");
+});
+
+test("不再拉取插件图标（/sources 与 img 都移除）", () => {
+  assert.equal(source.includes("/sources"), false, "客户端不再请求图标接口");
+  assert.equal(source.includes("dtn-ni__tile-img"), false);
+  assert.equal(source.includes("sourceIconCache"), false);
 });
 
 test("合并结果用副行表达次数，中断优先显示原因", () => {

@@ -968,12 +968,6 @@
                 },
               ];
 
-        /* dsh-todo 的图标（data URL），模拟宿主 /sources 的返回。 */
-        var PREVIEW_TODO_ICON =
-          "data:image/svg+xml;base64," +
-          btoa(
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7f79ff"/><stop offset="1" stop-color="#4b45cf"/></linearGradient></defs><rect x="8" y="8" width="240" height="240" rx="60" fill="url(#g)"/><path d="M64 138 L100 174 L188 86" fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-          );
         var settings = { sound: true };
         var rev = 1;
 
@@ -1031,9 +1025,6 @@
           }
           if (path.slice(-7) === "/notify") {
             return jsonResponse({ ok: true, delivered: 1 });
-          }
-          if (path.slice(-8) === "/sources") {
-            return jsonResponse({ sources: [{ labels: ["dsh-todo", "todo"], icon: PREVIEW_TODO_ICON }] });
           }
           if (path.slice(-5) === "/test") {
             return jsonResponse({ ok: true, sent: true });

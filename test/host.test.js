@@ -884,33 +884,6 @@ test("已读后再次完成会重新变未读；中断另起一条", async () =>
   assert.equal(state.notifications.find((item) => item.id === entry.id).count, 2, "完成条目不被中断覆盖");
 });
 
-test("/sources 从 pluginManager 读插件图标，缺失时返回空表", async () => {
-  const icon = "data:image/svg+xml;base64,PHN2Zy8+";
-  const services = {
-    pluginManager: {
-      listBundles: async () => [
-        { name: "@polunzh/dsh-todo", meta: { title: { en: "Todo", zh: "待办清单" }, icon } },
-        { name: "@polunzh/no-icon", meta: { title: "无图标" } },
-      ],
-      listPlugins: async () => [],
-    },
-  };
-  const harness = createHarness({ services });
-  const response = await harness.call({ url: "/task-notifier/api/sources" });
-  assert.equal(response.status, 200);
-  const labels = response.json.sources.flatMap((source) => source.labels);
-  for (const key of ["dsh-todo", "todo", "待办清单", "@polunzh/dsh-todo"]) {
-    assert.ok(labels.includes(key), `应能按 ${key} 匹配`);
-  }
-  assert.equal(response.json.sources.length, 1, "同一个 icon 只出现一份");
-  assert.equal(response.json.sources[0].icon, icon);
-
-  const bare = createHarness();
-  const empty = await bare.call({ url: "/task-notifier/api/sources" });
-  assert.equal(empty.status, 200);
-  assert.deepEqual(empty.json.sources, [], "没有 pluginManager 时降级为空表");
-});
-
 test("通知快照持久化，重启后仍在", async () => {
   const home = mkdtempSync(join(tmpdir(), "dtn-host-notif-"));
   const first = createHarness({ home });

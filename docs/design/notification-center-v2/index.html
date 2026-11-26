@@ -121,21 +121,15 @@
   .old:hover .old-open,.old[data-hover] .old-open{opacity:1}
 
   /* ================= 新行 ================= */
-  .r{display:flex;gap:12px;padding:10px 14px;cursor:pointer;position:relative}
-  .r + .r::before{content:"";position:absolute;left:54px;right:14px;top:0;height:1px;background:var(--border-1)}
+  .r{display:flex;gap:10px;padding:10px 14px;cursor:pointer;position:relative}
+  .r + .r::before{content:"";position:absolute;left:14px;right:14px;top:0;height:1px;background:var(--border-1)}
   .r:hover{background:var(--hover)}
   .r.unread{background:color-mix(in srgb,var(--business) 4%,transparent)}
-  .tile{width:28px;height:28px;flex:none;border-radius:8px;position:relative;display:grid;place-items:center;margin-top:1px}
-  .tile-task{background:linear-gradient(140deg,#5b8bf5,#2f57c4);color:#fff}
-  .tile-account{background:var(--bg-module);color:var(--label-2)}
-  .tile-plugin{background:transparent}
-  .tile-plugin svg{width:28px;height:28px}
-  .tile-fallback{background:var(--bg-module);color:var(--label-3)}
-  .udot{position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:var(--business);box-shadow:0 0 0 2px var(--bg-layer)}
-  .badge{position:absolute;right:-3px;bottom:-3px;width:12px;height:12px;border-radius:50%;display:grid;place-items:center;color:#fff;box-shadow:0 0 0 1.5px var(--bg-layer)}
-  .badge-warn{background:var(--warn)}
-  .badge-err{background:var(--error)}
-  .r-main{flex:1;min-width:0}
+  .tone{width:3px;height:16px;flex:none;margin-top:3px;border-radius:2px;background:var(--label-3)}
+  .tone-ok{background:var(--success)} .tone-warn{background:var(--warn)} .tone-err{background:var(--error)}
+  .tone-info{background:var(--business)} .tone-plugin{background:var(--label-3)}
+  .udot{width:6px;height:6px;flex:none;border-radius:50%;background:var(--business)}
+    .r-main{flex:1;min-width:0}
   .r-line{display:flex;align-items:center;gap:8px;min-height:17px}
   .r-title{font-size:13.5px;font-weight:500;color:var(--label-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .r.unread .r-title{font-weight:600}
@@ -173,7 +167,7 @@
   .case b{display:block;padding:0 14px 0 54px;font-size:10.5px;font-weight:500;color:var(--label-4);letter-spacing:.01em}
 
   .tiles{display:flex;gap:22px;padding:6px 2px 2px}
-  .tiles figure{display:flex;flex-direction:column;align-items:center;gap:8px;width:68px}
+  .tiles figure{display:flex;flex-direction:column;align-items:center;gap:8px;width:52px}
   .tiles figure span{font-size:10.5px;color:var(--label-3);text-align:center;line-height:1.35}
   .tile--lg{width:40px;height:40px;border-radius:11px;margin:0}
   .tile--lg svg.big{width:40px;height:40px}
@@ -200,8 +194,8 @@
   <header class="head">
     <div>
       <div class="kicker">dsh-task-notifier · 通知中心</div>
-      <h1>视觉改版 v2：应用图标与降噪</h1>
-      <p class="lede">同一批真实事件（2026-11-25 16:50，10 条通知）在现状与改版后的样子。改版做三件事：把来源交给图标、把重复的完成事件合成一行、把每行压到 44–62px。</p>
+      <h1>通知中心改版：配色与降噪</h1>
+      <p class="lede">同一批真实事件（2026-11-25 16:50，10 条通知）在现状与改版后的样子。改版做三件事：用行首色条表达状态、用文字说清来源、把重复的完成事件合成一行、把每行压到 44–62px。</p>
     </div>
     <div class="head-meta">
       <span class="tagchip">面板 400 × 640</span>
@@ -233,13 +227,13 @@
     </div>
 
     <div class="card card--tiles">
-      <div class="card-h"><h2>应用瓦片</h2><span>28px，圆角 8</span></div>
+      <div class="card-h"><h2>状态色</h2><span>3 × 16，圆角 2</span></div>
       <div class="tiles" id="tiles"></div>
       <dl class="spec">
-        <dt>任务</dt><dd>渐变 <code>#5b8bf5 → #2f57c4</code> + 白色星芒</dd>
-        <dt>账号</dt><dd><code>bg-module</code> 底 + 喇叭</dd>
-        <dt>插件</dt><dd>插件自己的 <code>icon</code>（data URL）</dd>
-        <dt>降级</dt><dd>灰底拼图，不出现破图</dd>
+        <dt>完成</dt><dd><code>success</code> 绿</dd>
+        <dt>中断</dt><dd><code>warn</code> 琥珀；报错 <code>error</code> 红</dd>
+        <dt>账号</dt><dd><code>business</code> 蓝</dd>
+        <dt>插件</dt><dd>中性灰，靠副行「插件：dsh-todo」识别</dd>
       </dl>
     </div>
 
@@ -260,7 +254,7 @@
     <figure class="shot" id="shot-dark" data-theme="dark"></figure>
     <div class="dark-copy" data-theme="light">
       <h2>深色与窄屏</h2>
-      <p>深色下瓦片底色换成 <code>bg-module</code>，徽标与未读点的描边取面板底色，插件图标本身自带底色所以不变。</p>
+      <p>深色下色条直接用状态色 token，未读点取 <code>business</code>；插件来源只靠副行文字识别，不依赖任何图标素材。</p>
       <ul>
         <li>窄于 640px 时面板变全宽 sheet，行结构与图标不变。</li>
         <li>合并条目只在副行写「完成 5 次」，单次结果不写。</li>
@@ -290,16 +284,6 @@ const I = {
   funnel: ico('<path d="M3.5 5h17l-6.6 7.7v5.5l-3.8 2v-7.5Z"/>', 15),
   spark: '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6c.4 3.6 1.9 5.9 5.4 7.1l2.2.7-2.2.7c-3.5 1.2-5 3.5-5.4 7.1-.4-3.6-1.9-5.9-5.4-7.1l-2.2-.7 2.2-.7c3.5-1.2 5-3.5 5.4-7.1Z"/><path d="M19.4 15.4c.2 1.5.8 2.4 2.2 2.9-1.4.5-2 1.4-2.2 2.9-.2-1.5-.8-2.4-2.2-2.9 1.4-.5 2-1.4 2.2-2.9Z" opacity=".85"/></svg>',
 };
-/* dsh-todo 的真实图标（gradient + 白色对勾），原样缩小到 28px */
-const todoIcon = `<svg viewBox="0 0 256 256" aria-hidden="true"><defs><linearGradient id="dshTodo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7f79ff"/><stop offset="1" stop-color="#4b45cf"/></linearGradient></defs><rect x="0" y="0" width="256" height="256" rx="64" fill="url(#dshTodo)"/><path d="M64 138 L100 174 L188 86" fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-
-const tile = {
-  task: `<span class="tile tile-task">${I.spark}</span>`,
-  account: `<span class="tile tile-account">${I.megaphone}</span>`,
-  plugin: `<span class="tile tile-plugin">${todoIcon}</span>`,
-  fallback: `<span class="tile tile-fallback">${I.puzzle}</span>`,
-};
-
 /* ---------- 数据：改版前（= 用户截图里的事件流） ---------- */
 const before = [
   { kind: 'plugin', title: '休息结束', body: '回来继续专注吧。', chip: '插件：dsh-todo', time: '刚刚', unread: true, hover: true },
@@ -317,13 +301,13 @@ const before = [
 /* ---------- 数据：改版后（同一批事件，按会话+结果合并） ---------- */
 const after = [
   { group: '今天' },
-  { kind: 'plugin', title: '休息结束', source: 'dsh-todo', meta: '回来继续专注吧。', time: '刚刚', unread: true },
-  { kind: 'task', title: 'Mnemon idle checkpoint review', meta: '完成 2 次', time: '7 分钟前' },
-  { kind: 'task', title: '右上角全局通知中心设计', meta: '完成 5 次', time: '9 分钟前' },
-  { kind: 'account', title: 'DeepSeek 账号', meta: '本月额度已重置，新的用量周期从现在开始。', time: '10 分钟前' },
-  { kind: 'task', title: 'Mnemon idle checkpoint review', meta: '已中断 · 退出', metaTone: 'warn', badge: 'warn', time: '12 分钟前' },
-  { kind: 'task', title: '番茄钟提醒接入通知中心', time: '14 分钟前' },
-  { kind: 'task', title: '审查通知中心合并策略', time: '16 分钟前' },
+  { tone: 'plugin', title: '休息结束', source: '插件：dsh-todo', meta: '回来继续专注吧。', time: '刚刚', unread: true },
+  { tone: 'ok', title: 'Mnemon idle checkpoint review', meta: '完成 2 次', time: '7 分钟前' },
+  { tone: 'ok', title: '右上角全局通知中心设计', meta: '完成 5 次', time: '9 分钟前' },
+  { tone: 'info', title: 'DeepSeek 账号', meta: '本月额度已重置，新的用量周期从现在开始。', time: '10 分钟前' },
+  { tone: 'warn', title: 'Mnemon idle checkpoint review', meta: '已中断 · 退出', metaTone: 'warn', time: '12 分钟前' },
+  { tone: 'ok', title: '番茄钟提醒接入通知中心', time: '14 分钟前' },
+  { tone: 'ok', title: '审查通知中心合并策略', time: '16 分钟前' },
 ];
 
 /* ---------- 旧面板 ---------- */
@@ -363,13 +347,11 @@ function oldPanel() {
 
 /* ---------- 新面板 ---------- */
 function newRow(d) {
-  const badge = d.badge ? `<span class="badge badge-${d.badge}">${I.alert}</span>` : '';
   const dot = d.unread ? '<span class="udot"></span>' : '';
-  const t = tile[d.kind] || tile.task;
   return `<div class="r${d.unread ? ' unread' : ''}">
-    ${t === tile.plugin || t === tile.task || t === tile.account ? t.replace('</span>', badge + dot + '</span>') : t}
+    <span class="tone tone-${d.tone || 'ok'}"></span>
     <div class="r-main">
-      <div class="r-line"><span class="r-title">${d.title}</span><span class="r-time">${d.time}</span></div>
+      <div class="r-line">${dot}<span class="r-title">${d.title}</span><span class="r-time">${d.time}</span></div>
       ${d.source || d.meta ? `<div class="r-meta${d.metaTone ? ' ' + d.metaTone : ''}">${d.source ? `<span class="r-source">${d.source}</span>${d.meta ? '<span class="r-sep">·</span>' : ''}` : ''}${d.meta ? `<span>${d.meta}</span>` : ''}</div>` : ''}
     </div>
   </div>`;
@@ -415,21 +397,22 @@ shotAfter.innerHTML = `
 
 /* ---------- 行状态 ---------- */
 const cases = [
-  { d: { kind: 'plugin', title: '休息结束', source: 'dsh-todo', meta: '回来继续专注吧。', time: '刚刚', unread: true }, note: '未读插件行 · 副行首列是插件名，后接正文' },
-  { d: { kind: 'task', title: '番茄钟提醒接入通知中心', time: '14 分钟前' }, note: '已读完成行 · 44px，一个信号都不多' },
-  { d: { kind: 'task', title: '右上角全局通知中心设计', meta: '完成 5 次', time: '9 分钟前' }, note: '合并计数 · 副行「完成 5 次」' },
-  { d: { kind: 'task', title: 'Mnemon idle checkpoint review', meta: '已中断 · 退出', metaTone: 'warn', badge: 'warn', time: '12 分钟前' }, note: '中断行 · 琥珀徽标 + 结果文案' },
-  { d: { kind: 'account', title: 'DeepSeek 账号', meta: '本月额度已重置，新的用量周期从现在开始。', time: '10 分钟前' }, note: '账号行 · 灰瓦片 + 正文' },
+  { d: { tone: 'plugin', title: '休息结束', source: '插件：dsh-todo', meta: '回来继续专注吧。', time: '刚刚', unread: true }, note: '未读插件行 · 灰条 + 未读点 + 副行写插件名' },
+  { d: { tone: 'ok', title: '番茄钟提醒接入通知中心', time: '14 分钟前' }, note: '已读完成行 · 绿条，44px，一个信号都不多' },
+  { d: { tone: 'ok', title: '右上角全局通知中心设计', meta: '完成 5 次', time: '9 分钟前' }, note: '合并计数 · 副行「完成 5 次」' },
+  { d: { tone: 'warn', title: 'Mnemon idle checkpoint review', meta: '已中断 · 退出', metaTone: 'warn', time: '12 分钟前' }, note: '中断行 · 琥珀条 + 结果文案' },
+  { d: { tone: 'info', title: 'DeepSeek 账号', meta: '本月额度已重置，新的用量周期从现在开始。', time: '10 分钟前' }, note: '账号行 · 蓝条 + 正文' },
 ];
 document.getElementById('rowcases').innerHTML = cases.map((c) => `<div class="case">${newRow(c.d)}<b>${c.note}</b></div>`).join('');
 
-/* ---------- 瓦片 ---------- */
+/* ---------- 状态色 ---------- */
 document.getElementById('tiles').innerHTML = [
-  ['task', '任务结果'],
-  ['account', '账号通知'],
-  ['plugin', '插件 · dsh-todo'],
-  ['fallback', '降级 · 拼图'],
-].map(([k, label]) => `<figure>${tile[k].replace('class="tile ', 'class="tile tile--lg ').replace('<svg viewBox="0 0 256 256"', '<svg class="big" viewBox="0 0 256 256"')}<span>${label}</span></figure>`).join('');
+  ['ok', '完成'],
+  ['warn', '中断'],
+  ['err', '报错'],
+  ['info', '账号'],
+  ['plugin', '插件'],
+].map(([tone, label]) => `<figure><span class="tone tone-${tone}" style="height:40px;width:6px;margin:0"></span><span>${label}</span></figure>`).join('');
 
 /* ---------- 来源菜单 ---------- */
 document.getElementById('funnelBtn').innerHTML = I.funnel;

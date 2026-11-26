@@ -18,7 +18,7 @@
 
 Long-running DSH sessions finish while you are looking somewhere else. This plugin pushes "done" to where you can see it:
 
-- **Top-right notification center** — a bell visible on every screen (conversation, plugins page, settings) with an unread badge that aggregates all sources; clicking opens one inbox with `All / Unread / Action` and source filters, and **Open task panel** at the bottom reaches the original 3-lane board. Each row leads with the source's app icon — plugin notices show that plugin's own icon, task and account notices use built-in tiles, and a plugin's name leads the subtitle (`dsh-todo · Back to focus.`); repeated completions of one session collapse into a single row with "Completed N×", and the unread badge no longer multiplies per turn.
+- **Top-right notification center** — a bell visible on every screen (conversation, plugins page, settings) with an unread badge that aggregates all sources; clicking opens one inbox with `All / Unread / Action` and source filters, and **Open task panel** at the bottom reaches the original 3-lane board. Each row leads with the source's app icon — a status rail encodes state (green done, amber/red interrupted, blue account, grey plugin) and plugin notices name their publisher at the head of the subtitle (`Plugin: dsh-todo · Back to focus.`); repeated completions of one session collapse into a single row with "Completed N×", and the unread badge no longer multiplies per turn.
 - **Aggregates multiple sources** — this plugin's task events, built-in account notices, and notifications published by other plugins (`ctx.notifications.post()` or `window.dshNotifications`) all converge here; system notifications and the chime fire from one place, so sources never double-notify.
 - **Chime** — when any session's turn ends, the browser synthesizes a short ascending chime (G5→C6); no audio assets needed.
 - **Two notification channels**:
@@ -128,7 +128,7 @@ If you previously installed a `link:` copy or an older version, **keep only one*
 |---|---|
 | ![Notification center light](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/center-light.png) | ![Notification center dark](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/center-dark.png) |
 
-| Notification center (English) | Design sheet (row anatomy and icons) |
+| Notification center (English) | Design sheet (row anatomy and colours) |
 |---|---|
 | ![Notification center English](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/center-light-en.png) | ![Design sheet](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/docs/design/notification-center-v2/mockup-zh.png) |
 

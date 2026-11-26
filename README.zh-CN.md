@@ -18,7 +18,7 @@
 
 DSH 跑长任务时，你切走去干别的，回来才发现早就跑完了。这个插件把「完成」这件事推到你能看到的地方：
 
-- **右上角通知中心**：任何界面（会话、插件页、设置页）右上角都有一个铃铛，未读角标汇总所有来源；点开是统一收件箱，按「全部 / 未读 / 待处理」和来源筛选，底部「打开任务面板」进入原来的三列看板。每行左侧是来源的应用图标——插件通知直接显示插件自己的 icon，任务和账号用内置瓦片；插件名写在副行开头（`dsh-todo · 回来继续专注吧。`）；同一会话的重复完成合成一行，写「完成 N 次」，未读也不再按次数翻倍。
+- **右上角通知中心**：任何界面（会话、插件页、设置页）右上角都有一个铃铛，未读角标汇总所有来源；点开是统一收件箱，按「全部 / 未读 / 待处理」和来源筛选，底部「打开任务面板」进入原来的三列看板。每行左侧是一条状态色条（完成绿、中断琥珀/红、账号蓝、插件灰）；插件通知在副行开头写明「插件：dsh-todo」，来源一眼可辨；同一会话的重复完成合成一行，写「完成 N 次」，未读也不再按次数翻倍。
 - **多来源聚合**：本插件的任务事件、内置账号公告、以及其它插件主动发来的通知（`ctx.notifications.post()` 或 `window.dshNotifications`）都汇到这里；系统通知与提示音只由本插件统一弹出，避免各来源重复打扰。
 - **提示音**：任意会话一轮结束，浏览器合成一段上行 chime（G5→C6），不需要音频素材。
 - **通知双通道**：
@@ -117,7 +117,7 @@ dsh plugin --profile desktop add @polunzh/dsh-task-notifier
 |---|---|
 | ![通知中心浅色](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/center-light.png) | ![通知中心深色](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/center-dark.png) |
 
-| 通知中心（英文） | 设计稿（行结构与图标规格） |
+| 通知中心（英文） | 设计稿（行结构与状态色） |
 |---|---|
 | ![通知中心英文](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/preview/screenshots/center-light-en.png) | ![设计稿](https://raw.githubusercontent.com/polunzh/dsh-task-notifier/main/docs/design/notification-center-v2/mockup-zh.png) |
 
