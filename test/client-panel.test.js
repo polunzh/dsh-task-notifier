@@ -31,8 +31,12 @@ test("行结构：色条 + 标题 + 可选副行，没有应用瓦片", () => {
   assert.equal(source.includes("dtn-ni__open"), false, "不再有「打开」链接");
 });
 
-test("插件来源用文字标识：副行开头「插件：dsh-todo」", () => {
-  assert.match(source, /const source =\s*entry\.source === "plugin"\s*\? entry\.sourceLabel\s*\? t\("center\.pluginPrefix", \{ name: entry\.sourceLabel \}\)\s*: t\("center\.source\.plugin"\)/);
+test("每一行都写明发送方：任务 / 账号公告 / 插件：<name>", () => {
+  assert.match(source, /function sourceLabelOf\(entry\)/);
+  assert.match(source, /if \(entry\.source === "account"\) return t\("center\.accountBadge"\)/);
+  assert.match(source, /return t\("center\.source\.task"\)/, "任务来源也要有文字标识");
+  assert.match(source, /t\("center\.pluginPrefix", \{ name: entry\.sourceLabel \}\)/);
+  assert.match(source, /const source = sourceLabelOf\(entry\)/);
   assert.match(source, /className: "dtn-ni__source"/);
   assert.match(source, /className: "dtn-ni__sep"/);
   assert.match(source, /const metaLabel = \[meta\.source, meta\.text\]\.filter\(Boolean\)\.join\(" · "\)/, "无障碍标签也要带上来源");
