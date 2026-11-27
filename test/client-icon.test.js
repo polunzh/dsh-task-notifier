@@ -8,7 +8,8 @@ import { fileURLToPath } from "node:url";
  * 入口与图标的约束。
  *
  * 1.4.3 起：铃铛注册在会话头顶栏 utilities，紧挨「更多（…）」左侧；
- * 侧边栏「任务面板」入口（sidebar.panellist + main）保留，两者共用同一个 store。
+ * 侧边栏「任务面板」入口（sidebar.panellist + main）保留。
+ * 1.4.20 起：侧栏入口只做图标，未读数字只出现在右上角铃铛。
  */
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -35,9 +36,9 @@ test("铃铛带未读角标，且角标文案来自字典", () => {
   assert.match(source, /t\("center\.unread", \{ n: totalUnread \}\)/);
 });
 
-test("侧栏图标带未读角标", () => {
+test("侧栏图标只做入口，不带未读数字", () => {
   assert.match(source, /function TaskSidebarIcon/);
-  assert.match(source, /className: "dtn-panel-mark__badge"/);
+  assert.equal(source.includes("dtn-panel-mark__badge"), false, "未读数只在右上角铃铛，侧栏图标不再画角标");
 });
 
 test("角标计数包含未读通知与待处理任务", () => {

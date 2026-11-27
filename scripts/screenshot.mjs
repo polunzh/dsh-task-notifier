@@ -463,7 +463,7 @@ async function inspectPage(cdp, sessionId) {
         archiveVisible: visible('.dtn-archive__bar'),
         archiveText: archiveBar ? (archiveBar.innerText || '').trim() : '',
         sidebarIcon: !!document.querySelector('#sidebar-slot svg'),
-        sidebarBadge: !!document.querySelector('#sidebar-slot [data-dtn-badge]'),
+        sidebarBadge: !!document.querySelector('#sidebar-slot .dtn-panel-mark__badge'),
         panelHeight: rootRect ? Math.round(rootRect.height) : 0,
         panelWidth: rootRect ? Math.round(rootRect.width) : 0,
         pageWidth: pageRect ? Math.round(pageRect.width) : 0,
@@ -530,6 +530,7 @@ function validateShot(shot, info) {
   }
 
   if (!info.sidebarIcon) problems.push("侧栏 sidebar.panellist 图标没有渲染");
+  if (info.sidebarBadge) problems.push("侧栏图标又画了未读角标（未读数只在右上角铃铛）");
 
   // Chips 校验
   if (shot.kind !== "empty") {
