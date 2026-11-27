@@ -1,6 +1,6 @@
 {
   "name": "@polunzh/dsh-task-notifier",
-  "version": "1.4.18",
+  "version": "1.4.19",
   "description": "任务通知台：右上角常驻通知中心，聚合任务结果、账号公告与其它插件通知，任务完成或中断时响提示音并弹系统/浏览器通知；可展开为待回复、进行中、未读结果三列看板。A top-right notification center that aggregates task results, account notices and notifications from other plugins, with a chime and system/browser notifications, plus an expandable 3-lane task board for needs-input, running and unread results.",
   "type": "module",
   "main": "./lib/index.js",

@@ -39,7 +39,7 @@ test("每一行都写明发送方：任务 / 账号公告 / 插件：<name>", ()
   assert.match(source, /const source = sourceLabelOf\(entry\)/);
   assert.match(source, /className: "dtn-ni__source"/);
   assert.match(source, /className: "dtn-ni__sep"/);
-  assert.match(source, /const metaLabel = \[meta\.source, meta\.text\]\.filter\(Boolean\)\.join\(" · "\)/, "无障碍标签也要带上来源");
+  assert.match(source, /const metaLabel = \[meta\.source, meta\.text, meta\.group\]\.filter\(Boolean\)\.join\(" · "\)/, "无障碍标签也要带上来源与分组规模");
 });
 
 test("不再拉取插件图标（/sources 与 img 都移除）", () => {
@@ -51,7 +51,7 @@ test("不再拉取插件图标（/sources 与 img 都移除）", () => {
 test("合并结果用副行表达次数，中断优先显示原因", () => {
   assert.match(source, /center\.countCompleted/, "完成 N 次");
   assert.match(source, /center\.countInterrupted/, "中断 N 次");
-  assert.match(source, /function rowMeta\(entry\)/);
+  assert.match(source, /function rowMeta\(entry, childCount = 0\)/);
   assert.match(source, /metaTone|dtn-ni__meta--warn/);
   assert.match(source, /badge\.interrupted\.(quota|error|exit)/, "中断原因复用任务看板文案");
 });
@@ -73,7 +73,17 @@ test("分段控件的计数只在 > 0 时渲染", () => {
 test("中英文案都补齐新 key", () => {
   const zh = source.slice(source.indexOf("zh: {"), source.indexOf("en: {"));
   const en = source.slice(source.indexOf("en: {"));
-  for (const key of ["center.countCompleted", "center.countInterrupted", "center.sourceMenu"]) {
+  for (const key of [
+    "center.countCompleted",
+    "center.countInterrupted",
+    "center.childDone",
+    "center.childInterrupted",
+    "center.moreChildren",
+    "center.moreRunning",
+    "duration.minutes",
+    "duration.seconds",
+    "center.sourceMenu",
+  ]) {
     assert.ok(zh.includes(`"${key}"`), `中文缺 ${key}`);
     assert.ok(en.includes(`"${key}"`), `英文缺 ${key}`);
   }
@@ -111,4 +121,40 @@ test("触屏与窄屏没有 hover：未读行常驻对勾，时间照常显示",
   assert.match(source, /@media \(hover: none\), \(max-width: 640px\) \{/);
   assert.match(source, /\.dtn-ni\.is-unread \{ padding-right: 40px; \}/);
   assert.match(source, /\.dtn-ni__read \{ opacity: 1; pointer-events: auto; right: 10px; \}/);
+});
+
+test("运行中行混进「今天」，只在全部筛选与任务来源下出现", () => {
+  assert.match(source, /function runningGroups\(tasks\)/);
+  assert.match(source, /const showRunning = filter === "all" && \(sourceFilter === "all" \|\| sourceFilter === "task"\)/);
+  assert.match(source, /const todayBlock = \[\.\.\.runningRows, \.\.\.todayRows\]/);
+  assert.match(source, /key: "g:today"/);
+  assert.match(source, /key: "g:earlier"/);
+  assert.match(source, /MAX_RUNNING_GROUPS = 3/);
+  assert.match(source, /MAX_RUNNING_CHILDREN = 3/);
+});
+
+test("运行中行：色条 + 已运行 + 流动条 + 子代理树，没有标已读动作", () => {
+  assert.match(source, /className: "dtn-nr__row"/);
+  assert.match(source, /dtn-ni__tone dtn-ni__tone--info/);
+  assert.match(source, /t\("card\.runningFor"/);
+  assert.match(source, /className: "dtn-live dtn-nr__live"/);
+  assert.match(source, /className: "dtn-nr__kids"/);
+  assert.match(source, /dtn-nr__kid-ico--\$\{tone\}/);
+  assert.match(source, /center\.moreChildren/);
+  assert.match(source, /center\.moreRunning/);
+  const start = source.indexOf("function RunningGroup");
+  const seg = source.slice(start, start + 4000);
+  assert.equal(seg.includes("dtn-ni__read"), false, "运行中行不渲染单条已读按钮");
+});
+
+test("结果行带子代理规模；账号与插件行不加", () => {
+  assert.match(
+    source,
+    /const group = entry\.source === "task" && childCount > 0 \? t\("tree\.children", \{ n: childCount \}\) : null/,
+  );
+  assert.match(source, /entry\.source === "task" && entry\.sessionId \? childCounts\.get\(entry\.sessionId\) \?\? 0 : 0/);
+});
+
+test("空态把运行中行算进列表", () => {
+  assert.match(source, /!pinnedRows\.length && !todayBlock\.length && !earlierRows\.length/);
 });

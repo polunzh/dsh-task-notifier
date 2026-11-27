@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>通知列表里的任务进度 · 设计稿</title>
+<style>
+  :root{
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --bg-base:#fff; --bg-layer:#fff; --bg-module:#f5f6f7; --bg-canvas:#f2f3f5;
+    --label-1:#0f1115; --label-2:#61666b; --label-3:#81858c; --label-4:#adb2b8;
+    --border-1:#0000000a; --border-2:#0000001a; --border-3:#0000001f;
+    --business:#4176e6; --business-weak:#e4edfd;
+    --success:#22c55e; --success-tint:#e6faed;
+    --error:#ec1313; --error-tint:#fdeaea; --error-ink:#c81e1e;
+    --warn:#f59e0b; --warn-ink:#b56a06; --warn-tint:#fef5e7;
+    --hover:#2631480f; --active:#2631481a;
+    --shadow-panel:0 0 0 .5px #00000029,0 3px 8px 0 #00000008,0 0 16px 0 #00000005;
+    --shadow-prominent:0 0 0 .5px #00000029,0 8px 24px 0 #00000014,0 0 32px 0 #0000000d;
+  }
+  [data-theme="dark"]{
+    --bg-base:#141619; --bg-layer:#1b1e23; --bg-module:#1f2328; --bg-canvas:#0f1113;
+    --label-1:#e9ebee; --label-2:#a7adb6; --label-3:#7d838c; --label-4:#5c626b;
+    --border-1:#ffffff10; --border-2:#ffffff1f; --border-3:#ffffff2b;
+    --business:#6f96ec; --business-weak:#1e2a44;
+    --success:#34cf7c; --success-tint:#12281c;
+    --error:#f2555a; --error-tint:#2a1618; --error-ink:#ff8b8e;
+    --warn:#f5a623; --warn-ink:#f3b65a; --warn-tint:#2a2011;
+    --hover:#ffffff12; --active:#ffffff1c;
+    --shadow-panel:0 0 0 .5px #00000066,0 8px 24px 0 #00000066;
+    --shadow-prominent:0 0 0 .5px #00000080,0 12px 40px 0 #00000088;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{color-scheme:light}
+  body{
+    font-family:var(--font);color:var(--label-1);-webkit-font-smoothing:antialiased;
+    background:radial-gradient(circle at 1px 1px,#00000009 1px,transparent 0) 0 0/22px 22px,var(--bg-canvas);
+  }
+  button{font:inherit;color:inherit;background:none;border:0;cursor:default}
+  svg{display:block;flex:none}
+
+  .page{width:1240px;margin:0 auto;padding:40px 0 56px}
+
+  .head{display:flex;align-items:flex-end;gap:28px;padding:0 4px 28px;border-bottom:1px solid #00000014}
+  .kicker{font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--business);margin-bottom:8px}
+  h1{font-size:27px;font-weight:650;letter-spacing:-.01em}
+  .lede{margin-top:9px;font-size:13px;line-height:1.65;color:var(--label-2);max-width:680px}
+  .head-meta{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .tagchip{font-size:11px;font-weight:600;color:var(--label-2);background:#fff;border:1px solid #00000014;border-radius:20px;padding:5px 10px;white-space:nowrap}
+
+  .sec{padding-top:32px}
+  .sec-head{display:flex;align-items:baseline;gap:10px;padding:0 4px 14px}
+  .sec-head .num{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:#fff;background:#0f1115;border-radius:5px;padding:2px 6px}
+  .sec-head h2{font-size:14px;font-weight:650}
+  .sec-head p{font-size:12px;color:var(--label-3)}
+
+  /* ================= 面板外壳 ================= */
+  .nc{
+    width:400px;display:flex;flex-direction:column;overflow:hidden;position:relative;
+    background:var(--bg-layer);border:1px solid var(--border-2);border-radius:16px;
+    box-shadow:var(--shadow-prominent);
+  }
+  .nc--tall{height:640px}
+  .nc-head{flex:none;height:56px;display:flex;align-items:center;gap:8px;padding:0 10px 0 14px;border-bottom:1px solid var(--border-1)}
+  .nc-bell{color:var(--label-1)}
+  .nc-title{font-size:14px;font-weight:600;letter-spacing:.01em}
+  .nc-chip{font-size:11px;font-weight:600;color:var(--business);background:var(--business-weak);border-radius:9px;padding:1px 7px;line-height:15px}
+  .nc-sp{flex:1}
+  .nc-act{height:30px;display:inline-flex;align-items:center;padding:0 12px;border-radius:9px;background:var(--bg-module);font-size:12px;font-weight:500;color:var(--label-1)}
+  .nc-x{width:32px;height:32px;display:grid;place-items:center;border-radius:8px;color:var(--label-3)}
+
+  .nc-filter{flex:none;display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border-1)}
+  .nc-seg{display:flex;gap:2px;padding:2px;border-radius:9px;background:var(--bg-module)}
+  .nc-seg b{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:400;color:var(--label-2);padding:4px 10px;border-radius:7px}
+  .nc-seg b.on{background:var(--bg-layer);color:var(--label-1);font-weight:600;box-shadow:0 1px 2px #00000014}
+  .nc-seg b i{font-style:normal;font-size:10.5px;font-weight:600;color:var(--label-3)}
+  .nc-funnel{width:28px;height:28px;margin-left:auto;display:grid;place-items:center;border-radius:7px;color:var(--label-3)}
+
+  .nc-body{flex:1;overflow:hidden;padding:2px 0 6px;position:relative}
+  .nc-body--fade::after{content:"";position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(to bottom,transparent,var(--bg-layer));pointer-events:none}
+  .nc-group{display:flex;align-items:center;gap:6px;padding:10px 16px 6px;font-size:11px;font-weight:600;letter-spacing:.3px;color:var(--label-3)}
+  .nc-group i{width:6px;height:6px;border-radius:50%;background:var(--warn)}
+  .nc-group i.run{background:var(--business)}
+  .nc-group .n{font-weight:600;color:var(--label-3);font-variant-numeric:tabular-nums}
+  .nc-foot{flex:none;padding:10px 12px;border-top:1px solid var(--border-1)}
+  .nc-cta{width:100%;height:36px;display:flex;align-items:center;justify-content:center;gap:7px;border-radius:9px;background:var(--bg-module);color:var(--label-1);font-size:12.5px;font-weight:600}
+  .nc-cta svg{color:var(--label-3)}
+
+  .sect-head i.run{background:var(--business)}
+
+  /* ================= 通知行（现状结构） ================= */
+  .r{display:flex;gap:10px;padding:10px 14px;position:relative}
+  .r + .r::before{content:"";position:absolute;left:14px;right:14px;top:0;height:1px;background:var(--border-1)}
+  .r.unread{background:color-mix(in srgb,var(--business) 4%,transparent)}
+  .r.hover{background:var(--hover)}
+  .tone{width:3px;height:16px;flex:none;margin-top:3px;border-radius:2px;background:var(--label-3)}
+  .tone-ok{background:var(--success)} .tone-warn{background:var(--warn)} .tone-err{background:var(--error)}
+  .tone-info{background:var(--business)} .tone-plugin{background:var(--label-3)}
+  .r-main{flex:1;min-width:0}
+  .r-line{display:flex;align-items:center;gap:8px;min-height:17px}
+  .udot{width:6px;height:6px;flex:none;border-radius:50%;background:var(--business)}
+  .r-title{font-size:13.5px;font-weight:500;color:var(--label-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .r.unread .r-title{font-weight:600}
+  .r-end{position:relative;margin-left:auto;flex:none;display:flex;align-items:center;justify-content:flex-end}
+  .r-time{font-size:11px;color:var(--label-3);font-variant-numeric:tabular-nums}
+  .r-meta{margin-top:2px;font-size:12px;line-height:17px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .r-meta .r-source{color:var(--label-3);font-weight:500}
+  .r-meta .r-sep{margin:0 5px;color:var(--label-3)}
+  .r-meta.warn{color:var(--warn-ink)}
+  .r-meta.err{color:var(--error-ink)}
+
+  /* ================= 运行中：根行 ================= */
+  .run-group{position:relative}
+  .rr{display:flex;gap:10px;padding:10px 14px 9px;position:relative;cursor:pointer}
+  .rr + .rr::before,.rr-kids + .rr::before,.run-group + .run-group::before{
+    content:"";position:absolute;left:14px;right:14px;top:0;height:1px;background:var(--border-1);
+  }
+  .rr:hover{background:var(--hover)}
+  .rr-main{flex:1;min-width:0}
+  .rr-line{display:flex;align-items:center;gap:8px;min-height:17px}
+  .rr-title{font-size:13.5px;font-weight:500;color:var(--label-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rr-time{margin-left:auto;flex:none;font-size:11px;color:var(--label-3);font-variant-numeric:tabular-nums}
+  .rr-meta{margin-top:2px;font-size:12px;line-height:17px;color:var(--label-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:0}
+  .rr-meta .r-source{color:var(--label-3);font-weight:500}
+  .rr-meta .r-sep{margin:0 5px;color:var(--label-3)}
+  .rr-meta .lineage{display:inline-flex;align-items:center;gap:4px;color:var(--label-3)}
+  /* 不确定进度：沿用看板 .dtn-live 的流动条，不编造百分比 */
+  .rr-live{position:relative;display:block;height:3px;margin-top:6px;border-radius:2px;overflow:hidden;background:color-mix(in srgb,var(--business) 14%,transparent)}
+  .rr-live::after{content:"";position:absolute;inset:0 auto 0 0;width:38%;border-radius:2px;background:var(--business);animation:slide 1.6s cubic-bezier(.4,0,.2,1) infinite;animation-delay:-.55s}
+  /* 静态设计稿：把滑块停在轨道中段，避免截图被误读成「进度 10%」；运行时长按 1.6s 循环 */
+  .rr-live::after{animation:none;transform:translateX(84%)}
+  @keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(263%)}}
+  @media (prefers-reduced-motion: reduce){.rr-live::after{animation:none;transform:none}}
+
+  /* 子代理行：竖向连接线 + 肘线 */
+  .rr-kids{position:relative;margin-left:17px;padding-left:17px;padding-bottom:2px}
+  .rr-kids::before{content:"";position:absolute;left:0;top:-2px;bottom:15px;width:1px;background:var(--border-2)}
+  .rk{position:relative;display:flex;align-items:center;gap:7px;padding:3px 14px 3px 0;height:26px;cursor:pointer}
+  .rk::before{content:"";position:absolute;left:-17px;top:50%;width:17px;height:1px;background:var(--border-2)}
+  .rk:hover{background:var(--hover)}
+  .rk-ico{width:12px;height:12px;display:grid;place-items:center;flex:none;color:var(--success)}
+  .rk-ico.run{color:var(--business)}
+  .rk-ico.run::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+  .rk-ico.err{color:var(--error)}
+  .rk-ico.warn{color:var(--warn)}
+  .rk-title{font-size:12.5px;font-weight:500;color:var(--label-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rk-time{margin-left:auto;flex:none;font-size:10.5px;color:var(--label-3);font-variant-numeric:tabular-nums}
+  .rk-more{display:flex;align-items:center;gap:4px;margin-left:53px;padding:3px 14px 6px 0;font-size:11.5px;color:var(--label-3);cursor:pointer}
+  .rk-more svg{color:var(--label-4)}
+  .rk-more:hover{color:var(--label-1)}
+
+  /* ================= 布局 ================= */
+  .stage{display:flex;gap:40px;align-items:flex-start}
+  .col-cap{display:flex;align-items:center;gap:8px;padding:0 2px 10px;font-size:12px;color:var(--label-3)}
+  .col-cap b{flex:none;white-space:nowrap;font-size:12.5px;font-weight:650;color:var(--label-1)}
+  .col-cap .dot{width:6px;height:6px;border-radius:50%;background:var(--business)}
+  .col-cap .dot.warn{background:var(--warn)}
+  .note{margin-top:12px;font-size:11.5px;line-height:1.7;color:var(--label-3);max-width:400px}
+  .note b{color:var(--label-2);font-weight:600}
+
+  .duo{display:flex;gap:40px;align-items:flex-start}
+  .dark-wrap{padding:22px;border-radius:16px;background:#0f1113;border:1px solid #ffffff12}
+
+  .cards3{display:flex;gap:20px;align-items:flex-start}
+  .demo{width:400px;background:var(--bg-layer);border:1px solid var(--border-2);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-panel)}
+  .demo-cap{font-size:11.5px;color:var(--label-3);padding:0 2px 8px}
+  .demo-cap b{color:var(--label-1);font-weight:650}
+
+  .narrow{width:390px;background:var(--bg-layer);border:1px solid var(--border-2);border-radius:16px;overflow:hidden;box-shadow:var(--shadow-prominent)}
+
+  /* ================= 规格与规则 ================= */
+  .rules{display:flex;gap:20px;align-items:flex-start}
+  .card{background:var(--bg-layer);border:1px solid var(--border-2);border-radius:14px;box-shadow:var(--shadow-panel);padding:18px 20px}
+  .card h3{font-size:12.5px;font-weight:650;margin-bottom:12px}
+  .card h3 span{font-size:11px;font-weight:500;color:var(--label-3);margin-left:6px}
+  table{border-collapse:collapse;width:100%;font-size:12px}
+  th,td{text-align:left;padding:8px 10px 8px 0;vertical-align:top;color:var(--label-2);border-top:1px solid var(--border-1)}
+  th{font-weight:600;color:var(--label-3);font-size:11px;border-top:0;padding-top:0}
+  td b{color:var(--label-1);font-weight:600}
+  td code{font-family:"SF Mono",Menlo,monospace;font-size:11px;background:#00000008;border-radius:4px;padding:1px 4px}
+  .spec td:first-child{width:212px;white-space:nowrap}
+  .spec code{white-space:nowrap}
+  .bullet{display:flex;gap:9px;font-size:12px;line-height:1.7;color:var(--label-2);padding:6px 0}
+  .bullet i{width:5px;height:5px;border-radius:50%;background:var(--label-4);margin-top:8px;flex:none}
+  .bullet b{color:var(--label-1);font-weight:600}
+  .decisions{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding-top:2px}
+  .decision{padding:14px 16px;border-radius:12px;background:var(--bg-layer);border:1px solid var(--border-2);box-shadow:var(--shadow-panel)}
+  .decision .t{font-size:10.5px;font-weight:700;letter-spacing:.05em;color:var(--label-3);margin-bottom:7px}
+  .decision b{display:block;font-size:13px;font-weight:650;margin-bottom:5px}
+  .decision p{font-size:11.5px;line-height:1.65;color:var(--label-2)}
+  .foot{padding:30px 4px 0;font-size:11.5px;color:var(--label-3)}
+  .foot code{font-family:"SF Mono",Menlo,monospace;font-size:11px;background:#00000008;border-radius:4px;padding:1px 5px}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="head">
+    <div>
+      <div class="kicker">DSH-TASK-NOTIFIER · 通知中心</div>
+      <h1>通知列表里的任务进度</h1>
+      <p class="lede">「今天」里混入运行中任务：标题、已运行时长、不确定流动条，父会话下的子代理按树缩进，各自带状态；结果行副行补上「N 个子代理」。不新增区块头，其余行结构、色条、未读规则、筛选与铃铛角标全部保持现状。</p>
+    </div>
+    <div class="head-meta">
+      <span class="tagchip">面板 400 × 640</span>
+      <span class="tagchip">浅色 / 深色</span>
+      <span class="tagchip">窄屏 390</span>
+      <span class="tagchip">目标版本 1.4.19</span>
+    </div>
+  </div>
+
+  <!-- ================= 01 现状 / 改后 ================= -->
+  <div class="sec">
+    <div class="sec-head"><span class="num">01</span><h2>同一时刻：现状与改后</h2><p>数据相同：1 个等待审批、2 个运行中（其中 1 个带 3 个子代理）、2 条未读结果</p></div>
+    <div class="stage">
+      <div>
+        <div class="col-cap"><span class="dot warn"></span><b>现状</b><span>运行中的 2 个任务在面板里不存在，结果行也看不出分组</span></div>
+        <div class="nc nc--tall">
+          <div class="nc-head">
+            <svg class="nc-bell" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            <span class="nc-title">通知</span>
+            <span class="nc-chip">3 未读</span>
+            <span class="nc-sp"></span>
+            <button class="nc-act">全部已读</button>
+            <button class="nc-x"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          </div>
+          <div class="nc-filter">
+            <div class="nc-seg"><b class="on">全部</b><b>未读 <i>3</i></b><b>待处理 <i>1</i></b></div>
+            <button class="nc-funnel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg></button>
+          </div>
+          <div class="nc-body nc-body--fade" id="body-old"></div>
+          <div class="nc-foot">
+            <button class="nc-cta"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>打开任务面板</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="col-cap"><span class="dot"></span><b>改后</b><span>运行中行混进「今天」，结果行副行多出「3 个子代理」</span></div>
+        <div class="nc nc--tall">
+          <div class="nc-head">
+            <svg class="nc-bell" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            <span class="nc-title">通知</span>
+            <span class="nc-chip">3 未读</span>
+            <span class="nc-sp"></span>
+            <button class="nc-act">全部已读</button>
+            <button class="nc-x"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          </div>
+          <div class="nc-filter">
+            <div class="nc-seg"><b class="on">全部</b><b>未读 <i>3</i></b><b>待处理 <i>1</i></b></div>
+            <button class="nc-funnel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg></button>
+          </div>
+          <div class="nc-body nc-body--fade" id="body-new"></div>
+          <div class="nc-foot">
+            <button class="nc-cta"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>打开任务面板</button>
+          </div>
+        </div>
+      </div>
+      <div style="width:340px">
+        <div class="note" style="margin-top:0">
+          <b>垂直成本</b><br>
+          一个父会话 + 3 个子代理占 <b>约 138px</b>（父行 62 + 子行 26×3 + 连接线空间）；再加一个独立运行中任务 54px。它们排在「今天」最前，结果区被往下推；640 高的面板里仍留得下 2–3 行结果。<br><br>
+          <b>为什么排在今天最前</b><br>
+          运行中代表此刻正在发生的事，排在今天通知行前面；如果按开始时间混排，「12 分钟前开始」的活会掉到 8 分钟前的结果后面。它没有已读状态，完成即消失，所以不进未读计数。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 02 运行中解剖 ================= -->
+  <div class="sec">
+    <div class="sec-head"><span class="num">02</span><h2>运行中行 · 行结构</h2><p>放在「今天」区块最前；父行用色条 + 流动条表达「在跑」，子行只保留状态图标与右侧结果，不再加第二条色条</p></div>
+    <div class="stage">
+      <div>
+        <div class="col-cap"><span class="dot"></span><b>父会话 + 3 个子代理</b><span>1 运行 · 1 完成 · 1 中断</span></div>
+        <div class="demo" id="demo-group"></div>
+        <div class="demo-cap" style="padding-top:10px">父行副行 <code>任务 · 3 个子代理 · 1 运行</code>　子行右侧 <code>已运行 6 分钟</code> / <code>完成</code> / <code>中断</code></div>
+      </div>
+      <div>
+        <div class="col-cap"><span class="dot warn"></span><b>两个边界形态</b><span>独立子代理 / 超出 3 子上限</span></div>
+        <div class="demo" id="demo-edge"></div>
+        <div class="demo-cap" style="padding-top:10px">父会话没在跑时，子代理提升为根行，副行写「来自 工作区与插件排序」；第 4 个子代理折成一行跳看板</div>
+      </div>
+      <div style="width:340px">
+        <div class="card" style="padding:16px 18px">
+          <h3>为什么这样切</h3>
+          <div class="bullet"><i></i><span><b>父行一条流动条</b>：不确定进度不编百分比，和看板运行中卡片同一条 1.6s 动画；混进今天，不加区块头。</span></div>
+          <div class="bullet"><i></i><span><b>子行不重复状态</b>：图标 = 运行中 / 完成 / 中断，右侧给数字或结论，一行只放一件事。</span></div>
+          <div class="bullet"><i></i><span><b>只展开一层</b>：孙会话不进面板，完整树留给看板；面板宽度只有 400，再深就读不动了。</span></div>
+          <div class="bullet"><i></i><span><b>默认展开前 3 个</b>：不做折叠，第 4 个起折成「还有 N 个」，避免一个组吃掉整屏。</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 03 结果行 ================= -->
+  <div class="sec">
+    <div class="sec-head"><span class="num">03</span><h2>结果行的分组标注</h2><p>只在副行末尾追加「N 个子代理」，不展开子代理的结果；子代理结果仍然只在看板的未读结果列里</p></div>
+    <div class="cards3">
+      <div>
+        <div class="demo-cap"><b>① 有分组</b> · 次数之后</div>
+        <div class="demo" id="demo-result-group"></div>
+      </div>
+      <div>
+        <div class="demo-cap"><b>② 无分组</b> · 保持原样</div>
+        <div class="demo" id="demo-result-plain"></div>
+      </div>
+      <div>
+        <div class="demo-cap"><b>③ 分组刚收尾</b> · 运行中行消失，结果落到今天</div>
+        <div class="demo" id="demo-result-justdone"></div>
+      </div>
+    </div>
+    <p class="note">判断依据是当前任务表里是否还有 <code>parentId === sessionId</code> 的子会话；子会话被裁剪后不再标注，不报错、不补假数据。顺序固定：来源 → 次数 / 正文 → 分组规模。</p>
+  </div>
+
+  <!-- ================= 04 筛选与空态 ================= -->
+  <div class="sec">
+    <div class="sec-head"><span class="num">04</span><h2>筛选与「没有通知但有任务在跑」</h2><p>运行中不计未读，也不进「未读」筛选；空态只在真的什么都没有时出现</p></div>
+    <div class="stage">
+      <div>
+        <div class="col-cap"><span class="dot"></span><b>0 未读 · 只有 2 个任务在跑</b><span>面板不再是空的</span></div>
+        <div class="nc nc--tall">
+          <div class="nc-head">
+            <svg class="nc-bell" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            <span class="nc-title">通知</span>
+            <span class="nc-sp"></span>
+            <button class="nc-x"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          </div>
+          <div class="nc-filter">
+            <div class="nc-seg"><b class="on">全部</b><b>未读</b><b>待处理</b></div>
+            <button class="nc-funnel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg></button>
+          </div>
+          <div class="nc-body" id="body-runningonly"></div>
+          <div class="nc-foot">
+            <button class="nc-cta"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>打开任务面板</button>
+          </div>
+        </div>
+        <p class="note">铃铛没有角标：运行中不制造未读。打开面板仍然能看见正在发生什么。</p>
+      </div>
+      <div>
+        <div class="col-cap"><span class="dot"></span><b>「未读」筛选</b><span>运行中隐藏，只剩结果</span></div>
+        <div class="nc nc--tall">
+          <div class="nc-head">
+            <svg class="nc-bell" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            <span class="nc-title">通知</span>
+            <span class="nc-chip">3 未读</span>
+            <span class="nc-sp"></span>
+            <button class="nc-act">全部已读</button>
+            <button class="nc-x"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          </div>
+          <div class="nc-filter">
+            <div class="nc-seg"><b>全部</b><b class="on">未读 <i>3</i></b><b>待处理 <i>1</i></b></div>
+            <button class="nc-funnel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg></button>
+          </div>
+          <div class="nc-body" id="body-unread-tab"></div>
+          <div class="nc-foot">
+            <button class="nc-cta"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>打开任务面板</button>
+          </div>
+        </div>
+        <p class="note">「待处理」保持现状，只含等待回复 / 审批 / 计划审阅的会话，不把运行中混进来。</p>
+      </div>
+      <div style="width:340px">
+        <div class="card" style="padding:16px 18px">
+          <h3>计数口径</h3>
+          <div class="bullet"><i></i><span><b>铃铛角标</b> = 未读通知 + 等待处理。运行中 +0。</span></div>
+          <div class="bullet"><i></i><span><b>运行中行只按父会话分组</b>；子代理挂在父行下，不单独成行，也不计入未读。</span></div>
+          <div class="bullet"><i></i><span><b>来源筛选</b>：任务 / 全部来源时显示运行中；切到账号或插件时隐藏。</span></div>
+          <div class="bullet"><i></i><span><b>空态</b>：既没有通知、也没有运行中任务时，才显示「暂无通知」。</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 05 深色与英文 ================= -->
+  <div class="sec">
+    <div class="sec-head"><span class="num">05</span><h2>深色与英文</h2><p>色条、流动条、连接线全部取宿主 token；英文副行沿用 Task · 3 subagents · 1 running</p></div>
+    <div class="duo">
+      <div>
+        <div class="col-cap"><span class="dot"></span><b>深色</b><span>400 × 640</span></div>
+        <div class="dark-wrap" data-theme="dark">
+          <div class="nc nc--tall">
+            <div class="nc-head">
+              <svg class="nc-bell" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+              <span class="nc-title">通知</span>
+              <span class="nc-chip">3 未读</span>
+              <span class="nc-sp"></span>
+              <button class="nc-act">全部已读</button>
+              <button class="nc-x"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+            </div>
+            <div class="nc-filter">
+              <div class="nc-seg"><b class="on">全部</b><b>未读 <i>3</i></b><b>待处理 <i>1</i></b></div>
+              <button class="nc-funnel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg></button>
+            </div>
+            <div class="nc-body nc-body--fade" id="body-dark"></div>
+            <div class="nc-foot">
+              <button class="nc-cta"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>打开任务面板</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="col-cap"><span class="dot"></span><b>英文</b><span>400 × 640</span></div>
+        <div class="nc nc--tall" id="panel-en">
+          <div class="nc-head">
+            <svg class="nc-bell" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            <span class="nc-title">Notifications</span>
+            <span class="nc-chip">3 unread</span>
+            <span class="nc-sp"></span>
+            <button class="nc-act">Mark all read</button>
+            <button class="nc-x"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          </div>
+          <div class="nc-filter">
+            <div class="nc-seg"><b class="on">All</b><b>Unread <i>3</i></b><b>Action <i>1</i></b></div>
+            <button class="nc-funnel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg></button>
+          </div>
+          <div class="nc-body nc-body--fade" id="body-en"></div>
+          <div class="nc-foot">
+            <button class="nc-cta"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Open task panel</button>
+          </div>
+        </div>
+      </div>
+      <div style="width:340px">
+        <div class="note" style="margin-top:0">
+          <b>英文长度</b><br>
+          <code>Task · 3 subagents · 1 running</code> 在 400px 里刚好一行；标题会先截断，副行不折行。<br><br>
+          <b>深色</b><br>
+          色条 <code>state-business-primary</code>，流动条轨道 14% 同色；连接线与分隔线用 <code>border-l1</code>，没有写死颜色。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 06 窄屏 ================= -->
+  <div class="sec">
+    <div class="sec-head"><span class="num">06</span><h2>窄屏 390</h2><p>缩进与状态文案不变，标题优先截断；子行右侧保持 10.5px 等宽数字</p></div>
+    <div class="stage">
+      <div>
+        <div class="narrow">
+          <div class="nc-head">
+            <svg class="nc-bell" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            <span class="nc-title">通知</span>
+            <span class="nc-chip">3 未读</span>
+            <span class="nc-sp"></span>
+            <button class="nc-act">全部已读</button>
+            <button class="nc-x"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          </div>
+          <div class="nc-filter">
+            <div class="nc-seg"><b class="on">全部</b><b>未读 <i>3</i></b><b>待处理 <i>1</i></b></div>
+            <button class="nc-funnel"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg></button>
+          </div>
+          <div class="nc-body" id="body-narrow"></div>
+          <div class="nc-foot">
+            <button class="nc-cta"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>打开任务面板</button>
+          </div>
+        </div>
+      </div>
+      <div style="width:780px">
+        <div class="card">
+          <h3>窄屏规则 <span>沿用现有 sheet</span></h3>
+          <div class="bullet"><i></i><span><b>宽度</b>：&lt;640px 时面板变全宽 sheet，行内边距保持 14，子行缩进保持 17 + 17。</span></div>
+          <div class="bullet"><i></i><span><b>截断顺序</b>：标题先截断；「已运行 6 分钟」不折行、不被压缩；副行整行省略。</span></div>
+          <div class="bullet"><i></i><span><b>触屏</b>：运行中行本来就没有 hover 动作，不需要让位给对勾按钮；结果行沿用现有常驻对勾规则。</span></div>
+          <div class="bullet"><i></i><span><b>流动条</b>：<code>prefers-reduced-motion</code> 下停动画，改成静态 1/3 宽实心条，仍能读出「在跑」。</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 07 规格 ================= -->
+  <div class="sec">
+    <div class="sec-head"><span class="num">07</span><h2>视觉规格</h2><p>全部取宿主现有 token 与看板现有组件，不新增颜色与图标资源</p></div>
+    <div class="rules">
+      <div class="card" style="width:800px">
+        <table class="spec">
+          <tr><th>部位</th><th>规格</th></tr>
+          <tr><td><b>位置</b></td><td>运行中行排在「今天」区块最前，不新增区块头；「更早」不出现运行中行</td></tr>
+          <tr><td><b>顺序</b></td><td>根组按 <code>changeAt</code> 倒序；随后是今天的通知行（<code>ts</code> 倒序）；组内运行中优先</td></tr>
+          <tr><td><b>根行</b> <code>.dtn-nr</code></td><td>内边距 <code>10px 14px</code>，色条复用 <code>.dtn-ni__tone</code>（3×16、圆角 2、business），标题 <code>13.5 / 500</code></td></tr>
+          <tr><td><b>右侧时长</b></td><td><code>11px</code>、<code>label-tertiary</code>、等宽数字；文案复用 <code>card.runningFor</code>（已运行 {time}）</td></tr>
+          <tr><td><b>副行</b></td><td><code>12px / 17px</code>、<code>label-secondary</code>；来源 <code>任务</code> 用 tertiary；次数与子代理数复用 <code>tree.*</code> 文案</td></tr>
+          <tr><td><b>流动条</b> <code>.dtn-live</code></td><td>高 3、圆角 2；轨道 <code>business</code> 14%，滑块宽 38%，1.6s 循环；仅根行渲染</td></tr>
+          <tr><td><b>子行</b> <code>.dtn-nr__kid</code></td><td>高 26、左缩进 34；<code>border-l1</code> 竖线 + 10px 肘线；标题 <code>12.5 / 500</code>；右侧 <code>10.5px</code></td></tr>
+          <tr><td><b>子行状态</b></td><td>运行中：6px 蓝点；完成：11px 绿勾；中断：11px 琥珀 / 红警示</td></tr>
+          <tr><td><b>结果行分组</b></td><td>副行末尾追加 <code>· {n} 个子代理</code>，不新增图标、不占行</td></tr>
+          <tr><td><b>上限</b></td><td>3 个根组 × 每组 3 个子行；超出各一行「还有 {n} 个」链接到看板</td></tr>
+        </table>
+      </div>
+      <div style="flex:1">
+        <div class="card">
+          <h3>不改的部分</h3>
+          <div class="bullet"><i></i><span>通知行的色条、未读点、浅底、字重、分隔线、hover 对勾。</span></div>
+          <div class="bullet"><i></i><span>需要你处理置顶、今天 / 更早分组、来源筛选、全部已读。</span></div>
+          <div class="bullet"><i></i><span>铃铛角标口径与系统通知 / 提示音的触发。</span></div>
+          <div class="bullet"><i></i><span>看板三列、任务卡与发布契约。</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 08 决策 ================= -->
+  <div class="sec">
+    <div class="sec-head"><span class="num">08</span><h2>已确认的三件事</h2><p>2026-11-27 已定，实现按这三条执行</p></div>
+    <div class="decisions">
+      <div class="decision">
+        <div class="t">01 · 位置</div>
+        <b>混进「今天」</b>
+        <p>不新增区块，运行中行排在今天通知行前面，按父会话分组；「更早」只放历史通知。</p>
+      </div>
+      <div class="decision">
+        <div class="t">02 · 子代理</div>
+        <b>默认展开前 3 个</b>
+        <p>不做折叠交互，第 4 个起折成「还有 N 个 ›」，点击进任务面板看完整树。</p>
+      </div>
+      <div class="decision">
+        <div class="t">03 · 角标</div>
+        <b>运行中不计未读</b>
+        <p>铃铛角标只统计未读通知与等待处理。运行中靠打开面板后的流动条与时长表达，避免角标长期亮着。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">设计稿：<code>docs/design/inbox-task-progress/index.html</code>　·　设计说明：<code>docs/inbox-task-progress.md</code>　·　实现范围：<code>lib/client.js</code> 通知面板与样式</div>
+</div>
+
+<script>
+  const CHECK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m20 6-11 11-5-5"/></svg>';
+  const ALERT = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>';
+  const BRANCH = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>';
+  const CHEV = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
+
+  const T = {
+    zh: {
+      needYou: "需要你处理", running: "运行中", today: "今天", earlier: "更早",
+      task: "任务", from: "来自",
+      pinnedTitle: "确认是否覆盖线上数据", pinnedMeta: "等待审批", pinnedTime: "5 分钟前",
+      groupTitle: "插件与工作区顺序调整", groupTime: "已运行 12 分钟",
+      groupMeta: ["3 个子代理", "1 运行"],
+      child1: "审查通知中心合并策略", child1Time: "已运行 6 分钟",
+      child2: "支持编辑子任务改进", child2Time: "完成",
+      child3: "番茄时钟添加嘀嗒音效", child3Time: "完成",
+      child4: "补齐英文本地化词条与校对", child4Time: "完成",
+      soloTitle: "Mnemon idle checkpoint review", soloTime: "已运行 3 分钟",
+      promotedTitle: "补齐英文本地化词条与校对", promotedTime: "已运行 2 分钟", promotedFrom: "工作区与插件排序",
+      res1: "右上角全局通知中心设计", res1Time: "8 分钟前", res1Meta: ["完成 5 次", "3 个子代理"], res1Unread: true,
+      res2: "工作区与插件排序", res2Time: "20 分钟前", res2Meta: ["完成 1 次"], res2Unread: true,
+      res3: "专注结束", res3Time: "1 小时前", res3Plugin: "插件：dsh-todo", res3Body: "休息 5 分钟，或者直接开始下一个番茄。",
+      res4: "DeepSeek 账号", res4Time: "1 小时前", res4Source: "账号公告", res4Body: "本月额度已重置，新的用量周期从现在开始。",
+      resJust: "插件与工作区顺序调整", resJustTime: "刚刚", resJustMeta: ["完成 1 次", "3 个子代理"], resJustUnread: true,
+      resRead: "慢速模型切换评估", resReadMeta: "完成 1 次", resReadTime: "25 分钟前",
+      earlyRows: [
+        { title: "初始化项目脚手架与代码规范检查", meta: "完成 1 次", time: "4 小时前" },
+        { title: "配置自动化集成流水线 Webhook", meta: "完成 1 次", time: "昨天" },
+      ],
+      moreChildren: "还有 2 个", moreOne: "还有 1 个", moreRunning: "还有 2 个运行中",
+    },
+    en: {
+      needYou: "Needs you", running: "Running", today: "Today", earlier: "Earlier",
+      task: "Task", from: "from",
+      pinnedTitle: "Confirm overwriting production data", pinnedMeta: "Waiting on your approval", pinnedTime: "5m ago",
+      groupTitle: "Plugin and workspace ordering", groupTime: "Running 12m",
+      groupMeta: ["3 subagents", "1 running"],
+      child1: "Review notification merge strategy", child1Time: "Running 6m",
+      child2: "Subtask editing improvements", child2Time: "Done",
+      child3: "Pomodoro tick sound", child3Time: "Done",
+      child4: "English locale entries", child4Time: "Done",
+      soloTitle: "Mnemon idle checkpoint review", soloTime: "Running 3m",
+      promotedTitle: "English locale entries", promotedTime: "Running 2m", promotedFrom: "Workspace and plugin ordering",
+      res1: "Global notification center design", res1Time: "8m ago", res1Meta: ["Completed 5×", "3 subagents"], res1Unread: true,
+      res2: "Workspace and plugin ordering", res2Time: "20m ago", res2Meta: ["Completed 1×"], res2Unread: true,
+      res3: "Rest ended", res3Time: "1h ago", res3Plugin: "Plugin: dsh-todo", res3Body: "Back to focus.",
+      res4: "DeepSeek account", res4Time: "1h ago", res4Source: "Account", res4Body: "Quota reset for the new billing period.",
+      resJust: "Plugin and workspace ordering", resJustTime: "just now", resJustMeta: ["Completed 1×", "3 subagents"], resJustUnread: true,
+      resRead: "Slow-model switch review", resReadMeta: "Completed 1×", resReadTime: "25m ago",
+      earlyRows: [
+        { title: "Project scaffold and lint setup", meta: "Completed 1×", time: "4h ago" },
+        { title: "CI pipeline webhook", meta: "Completed 1×", time: "yesterday" },
+      ],
+      moreChildren: "2 more", moreOne: "1 more", moreRunning: "2 more running",
+    },
+  };
+
+  function groupHead(label, count, kind) {
+    const dot = kind ? `<i class="${kind === "run" ? "run" : ""}"></i>` : "";
+    const n = count ? `<span class="n">${count}</span>` : "";
+    return `<div class="nc-group">${dot}${label}${n}</div>`;
+  }
+
+  function row(o) {
+    const cls = ["r", o.unread ? "unread" : "", o.hover ? "hover" : ""].filter(Boolean).join(" ");
+    const dot = o.unread ? '<span class="udot"></span>' : "";
+    const parts = [];
+    if (o.source) parts.push(`<span class="r-source">${o.source}</span>`);
+    for (const item of o.meta || []) {
+      if (parts.length) parts.push('<span class="r-sep">·</span>');
+      parts.push(`<span>${item}</span>`);
+    }
+    const meta = parts.length ? `<div class="r-meta ${o.metaTone || ""}">${parts.join("")}</div>` : "";
+    return `<div class="${cls}${o.pinned ? " pinned" : ""}">
+      <span class="tone tone-${o.tone}"></span>
+      <div class="r-main">
+        <div class="r-line">${dot}<span class="r-title">${o.title}</span>
+          <span class="r-end"><span class="r-time">${o.time}</span></span>
+        </div>
+        ${meta}
+      </div>
+    </div>`;
+  }
+
+  function runningRoot(o) {
+    const lineage = o.from
+      ? `<span class="r-sep">·</span><span class="lineage">${BRANCH}${o.fromLabel || ""}${o.from}</span>`
+      : "";
+    const metaParts = [`<span class="r-source">${o.taskLabel}</span>`];
+    for (const item of o.meta || []) metaParts.push(`<span class="r-sep">·</span><span>${item}</span>`);
+    const live = o.live ? '<span class="rr-live" aria-hidden="true"></span>' : "";
+    return `<div class="run-group">
+      <div class="rr">
+        <span class="tone tone-info"></span>
+        <div class="rr-main">
+          <div class="rr-line"><span class="rr-title">${o.title}</span><span class="rr-time">${o.time}</span></div>
+          <div class="rr-meta">${metaParts.join("")}${lineage}</div>
+          ${live}
+        </div>
+      </div>
+      ${o.children ? kids(o.children, o.more) : ""}
+    </div>`;
+  }
+
+  function kids(children, more) {
+    const shown = more ? children.slice(0, 3) : children;
+    const rows = shown.map((c) => {
+      const ico = c.state === "run"
+        ? '<span class="rk-ico run"></span>'
+        : c.state === "err"
+          ? `<span class="rk-ico err">${ALERT}</span>`
+          : c.state === "warn"
+            ? `<span class="rk-ico warn">${ALERT}</span>`
+            : `<span class="rk-ico">${CHECK}</span>`;
+      return `<div class="rk">${ico}<span class="rk-title">${c.title}</span><span class="rk-time">${c.time}</span></div>`;
+    }).join("");
+    const moreRow = more ? `<div class="rk-more">${more}${CHEV}</div>` : "";
+    return `<div class="rr-kids">${rows}</div>${moreRow}`;
+  }
+
+  function panelBody(kind, t) {
+    if (kind === "old") {
+      return groupHead(t.needYou, "", "todo")
+        + row({ tone: "warn", title: t.pinnedTitle, meta: [t.pinnedMeta], metaTone: "warn", time: t.pinnedTime })
+        + groupHead(t.today, "", "")
+        + row({ tone: "ok", unread: true, title: t.res1, source: t.task, meta: t.res1Meta, time: t.res1Time })
+        + row({ tone: "ok", unread: true, title: t.res2, source: t.task, meta: t.res2Meta, time: t.res2Time })
+        + row({ tone: "ok", title: t.resRead, source: t.task, meta: [t.resReadMeta], time: t.resReadTime })
+        + row({ tone: "plugin", title: t.res3, source: t.res3Plugin, meta: [t.res3Body], time: t.res3Time })
+        + row({ tone: "info", title: t.res4, source: t.res4Source, meta: [t.res4Body], time: t.res4Time })
+        + groupHead(t.earlier, "", "")
+        + t.earlyRows.map((r) => row({ tone: "ok", title: r.title, source: t.task, meta: [r.meta], time: r.time })).join("")
+        ;
+    }
+    if (kind === "new") {
+      return groupHead(t.needYou, "", "todo")
+        + row({ tone: "warn", title: t.pinnedTitle, meta: [t.pinnedMeta], metaTone: "warn", time: t.pinnedTime })
+        + groupHead(t.today, "", "")
+        + runningRoot({
+            taskLabel: t.task, title: t.groupTitle, time: t.groupTime, meta: t.groupMeta, live: true,
+            children: [
+              { state: "run", title: t.child1, time: t.child1Time },
+              { state: "done", title: t.child2, time: t.child2Time },
+              { state: "done", title: t.child3, time: t.child3Time },
+            ],
+          })
+        + runningRoot({ taskLabel: t.task, title: t.soloTitle, time: t.soloTime, meta: [], live: false })
+        + row({ tone: "ok", unread: true, title: t.res1, source: t.task, meta: t.res1Meta, time: t.res1Time })
+        + row({ tone: "ok", unread: true, title: t.res2, source: t.task, meta: t.res2Meta, time: t.res2Time })
+        + row({ tone: "ok", title: t.resRead, source: t.task, meta: [t.resReadMeta], time: t.resReadTime })
+        + row({ tone: "plugin", title: t.res3, source: t.res3Plugin, meta: [t.res3Body], time: t.res3Time })
+        + row({ tone: "info", title: t.res4, source: t.res4Source, meta: [t.res4Body], time: t.res4Time })
+        + groupHead(t.earlier, "", "")
+        + t.earlyRows.map((r) => row({ tone: "ok", title: r.title, source: t.task, meta: [r.meta], time: r.time })).join("")
+        ;
+    }
+    if (kind === "runningonly") {
+      return groupHead(t.today, "", "")
+        + runningRoot({
+            taskLabel: t.task, title: t.groupTitle, time: t.groupTime, meta: t.groupMeta, live: true,
+            children: [
+              { state: "run", title: t.child1, time: t.child1Time },
+              { state: "done", title: t.child2, time: t.child2Time },
+              { state: "done", title: t.child3, time: t.child3Time },
+            ],
+          })
+        + runningRoot({ taskLabel: t.task, title: t.soloTitle, time: t.soloTime, meta: [], live: false });
+    }
+    if (kind === "unread") {
+      return groupHead(t.today, "", "")
+        + row({ tone: "ok", unread: true, title: t.res1, source: t.task, meta: t.res1Meta, time: t.res1Time })
+        + row({ tone: "ok", unread: true, title: t.res2, source: t.task, meta: t.res2Meta, time: t.res2Time })
+        + row({ tone: "warn", unread: true, title: "补齐插件市场截图", source: t.task, meta: ["中断 · 退出"], metaTone: "warn", time: "58 分钟前" });
+    }
+    if (kind === "edge") {
+      return groupHead(t.today, "", "")
+        + runningRoot({
+          taskLabel: t.task, title: t.promotedTitle, time: t.promotedTime, meta: [],
+          fromLabel: t.from + " ", from: t.promotedFrom, live: false,
+        })
+        + runningRoot({
+            taskLabel: t.task, title: t.groupTitle, time: t.groupTime, meta: t.groupMeta, live: true,
+            children: [
+              { state: "run", title: t.child1, time: t.child1Time },
+              { state: "done", title: t.child2, time: t.child2Time },
+              { state: "done", title: t.child3, time: t.child3Time },
+              { state: "done", title: t.child4, time: t.child4Time },
+            ],
+            more: t.moreOne,
+          });
+    }
+    if (kind === "result-group") {
+      return groupHead(t.today, "", "")
+        + row({ tone: "ok", unread: true, title: t.res1, source: t.task, meta: t.res1Meta, time: t.res1Time })
+        + row({ tone: "ok", title: t.res2, source: t.task, meta: t.res2Meta, time: t.res2Time });
+    }
+    if (kind === "result-plain") {
+      return groupHead(t.today, "", "")
+        + row({ tone: "ok", title: t.res2, source: t.task, meta: t.res2Meta, time: t.res2Time })
+        + row({ tone: "plugin", title: t.res3, source: t.res3Plugin, meta: [t.res3Body], time: t.res3Time });
+    }
+    if (kind === "result-justdone") {
+      return groupHead(t.today, "", "")
+        + row({ tone: "ok", unread: true, title: t.resJust, source: t.task, meta: t.resJustMeta, time: t.resJustTime })
+        + row({ tone: "ok", unread: true, title: t.res1, source: t.task, meta: t.res1Meta, time: t.res1Time });
+    }
+    return "";
+  }
+
+  document.getElementById("body-old").innerHTML = panelBody("old", T.zh);
+  document.getElementById("body-new").innerHTML = panelBody("new", T.zh);
+  document.getElementById("body-runningonly").innerHTML = panelBody("runningonly", T.zh);
+  document.getElementById("body-unread-tab").innerHTML = panelBody("unread", T.zh);
+  document.getElementById("body-dark").innerHTML = panelBody("new", T.zh);
+  document.getElementById("body-en").innerHTML = panelBody("new", T.en);
+  document.getElementById("body-narrow").innerHTML = panelBody("new", T.zh);
+
+  document.getElementById("demo-group").innerHTML = groupHead(T.zh.today, "", "") + runningRoot({
+    taskLabel: T.zh.task, title: T.zh.groupTitle, time: T.zh.groupTime, meta: T.zh.groupMeta, live: true,
+    children: [
+      { state: "run", title: T.zh.child1, time: T.zh.child1Time },
+      { state: "done", title: T.zh.child2, time: T.zh.child2Time },
+      { state: "err", title: "插件市场截图校对", time: "中断" },
+    ],
+  });
+  document.getElementById("demo-edge").innerHTML = panelBody("edge", T.zh);
+  document.getElementById("demo-result-group").innerHTML = panelBody("result-group", T.zh);
+  document.getElementById("demo-result-plain").innerHTML = panelBody("result-plain", T.zh);
+  document.getElementById("demo-result-justdone").innerHTML = panelBody("result-justdone", T.zh);
+</script>
+</body>
+</html>
